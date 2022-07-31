@@ -143,7 +143,7 @@ class JSSPEnv(gym.Env):
             reward = 0
             self.time -= 1
 
-        return self.get_obs, reward, done, []
+        return self.get_obs(), reward, done, []
 
     def reset(self):
 
@@ -154,7 +154,7 @@ class JSSPEnv(gym.Env):
         self.jobs_finished_operations = [0] * self.jobs
         self.jobs_status = [-1] * self.jobs
 
-        return self.get_obs, -1, False, []
+        return self.get_obs()
 
     def render(self, mode="human"):
 
