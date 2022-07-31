@@ -27,7 +27,7 @@ class JSSPEnv(gym.Env):
 
         self.observation_space = gym.spaces.Dict(
             {
-                "active": gym.spaces.Box(low=np.zeros(self.jobs), low=np.ones(self.jobs), dtype = int),
+                "active": gym.spaces.Box(low=np.zeros(self.jobs), high=np.ones(self.jobs), dtype = int),
                 "left_operations": gym.spaces.Box(low=np.ones(self.jobs), high=self.jobs_left_operations, dtype = int),
             }
         )
