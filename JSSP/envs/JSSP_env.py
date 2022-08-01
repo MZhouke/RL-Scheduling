@@ -5,8 +5,9 @@ import pandas as pd
 import random
 import datetime
 
+
 class JSSPEnv(gym.Env):
-    def __init__(self, env_data):
+    def __init__(self, instance_path):
 
         """
         env_data: n+1 rows
@@ -15,31 +16,86 @@ class JSSPEnv(gym.Env):
         """
 
         # initial values for variables used for instance
-        self.data = env_data
-        self.jobs, self.machines = self.data[0][0], self.data[0][1]
-        self.jobs_history = [[] for _ in range(self.jobs)]
+        # job_total is total # of jobs
+        # machine_total is total # of machines
+        # job operation map stores the description of the JSP
+        self.job_total, self.machine_total, self.job_operation_map = 0, 0, {}
+        self.initialize(instance_path)
+
+        self.jobs_history = [[] for _ in range(self.job_total)]
         self.machines_status = self.get_machines_status()
         self.time = 0
-        self.operation_times, self.jobs_operations= self.get_operation()
+        self.operation_times, self.jobs_operations = [],[]
         self.jobs_left_operations = self.jobs_operations
-        self.jobs_finished_operations = np.array([0] * self.jobs)
-        self.jobs_status = np.array([-1] * self.jobs)
+        self.jobs_finished_operations = np.array([0] * self.job_total)
+        self.jobs_status = np.array([-1] * self.job_total)
         # used for plotting
         self.colors = [
-            tuple([random.random() for _ in range(3)]) for _ in range(self.machines)
+            tuple([random.random() for _ in range(3)]) for _ in range(self.machine_total)
         ]
 
         # n x 1 array, each entry represents the action to the job, -1 means do nothing, m means go to machine m
         self.action_space = self.set_action_space()
 
-        self.observation_space = gym.spaces.Dict(
-            {
-                "active": gym.spaces.Box(low=np.zeros(self.jobs), high=np.ones(self.jobs), dtype = int),
-                "left_operations": gym.spaces.Box(low=np.ones(self.jobs), high=self.jobs_left_operations, dtype = int),
-            }
-        )
+        # self.observation_space = gym.spaces.Dict(
+        #     {
+        #         "active": gym.spaces.Box(low=np.zeros(self.job_total), high=np.ones(self.job_total), dtype=int),
+        #         "left_operations": gym.spaces.Box(low=np.ones(self.job_total), high=self.jobs_left_operations, dtype=int),
+        #     }
+        # )
+
+    def initialize(self, instance_path):
+        """
+            populate job_operation_map using the instance file input
+            :param instance_path: a string representing file path
+        """
+        # input instance description for environment initialization
+        instance_path = instance_path
+        file_handle = open(instance_path, 'r')
+        lines_list = file_handle.readlines()
+        # first line consists of # of jobs in total, # of machines in total
+        self.job_total, self.machine_total = [int(x) for x in lines_list[0].split()]
+        # env_data = [[int(val) for val in line.split()] for line in lines_list[1:]]
+        # read through each job description
+        for job_index in range(len(lines_list) - 1):
+            job_description = [int(val) for val in lines_list[job_index + 1].split()]
+            self.job_operation_map[job_index] = {}
+            # initialize job_operation_map
+            # ex. job_operation_map[1][2][3] = time it takes for 3rd machine to execute 2nd operation of 1st job
+            # time = -1 iff the machine is not capable of executing the operation based on instance description
+            for operation_index in range(job_description[0]):
+                self.job_operation_map[job_index][operation_index] = np.negative(np.ones(self.machine_total))
+            # populate job_description_map
+            self.populate_job_description_map(job_description, job_index)
+
+    def populate_job_description_map(self, job_description, job_index):
+        """
+            populate the corresponding fields in job_description_map
+            :param job_description: a string representing job description
+            :param job_index: an integer representing current job index being populated
+        """
+        # read job description from left to right
+        description_pivot = 1
+        operation_index = 0
+        # operation_index
+        while description_pivot < len(job_description):
+            # operation_description length = 2 * # of machines capable of executing current operation at the pivot
+            operation_description_end = 2 * job_description[description_pivot] + description_pivot
+            # read the current description of operation
+            description_pivot += 1
+            while description_pivot <= operation_description_end:
+                # Following the format of operation description:
+                # machine index , time it takes for the current operation
+                machine_index = job_description[description_pivot]
+                operation_duration = job_description[description_pivot + 1]
+                self.job_operation_map[job_index][operation_index][machine_index - 1] = operation_duration
+                description_pivot += 2
+            operation_index += 1
 
     def get_obs(self):
+        """
+        :return: observation from the current action
+        """
         return {
             "active": (self.jobs_status == -1).astype(int),
             "left_operations": self.jobs_left_operations,
@@ -52,7 +108,7 @@ class JSSPEnv(gym.Env):
         """
         legal_actions = []
 
-        for job in range(self.jobs):
+        for job in range(self.job_total):
             if self.jobs_status[job] == -1:
                 legal_actions.append([])
             else:
@@ -63,9 +119,9 @@ class JSSPEnv(gym.Env):
 
     def set_action_space(self):
 
-        lowbdd = np.full(self.jobs, -1)
-        highbdd = np.full(self.jobs, self.machines-1)
-        action_space = gym.spaces.Box(low=lowbdd, high=highbdd, dtype = int)
+        lowbdd = np.full(self.job_total, -1)
+        highbdd = np.full(self.job_total, self.machine_total - 1)
+        action_space = gym.spaces.Box(low=lowbdd, high=highbdd, dtype=int)
 
         return action_space
 
@@ -74,44 +130,43 @@ class JSSPEnv(gym.Env):
         -1 means unoccupied
         other number(eg. i) means occupied by i-th job
         """
-        m = self.data[0][1]
-        return np.array([-1]*m)
+        return np.array([-1] * self.machine_total)
 
     def get_operation(self):
         """
         opn: operation no
         opt: operation time
         """
-        n, m = self.jobs, self.machines
-        opn = np.zeros(n,dtype=int)
-        maxnum = self.data[1][0]
+        # n, m = self.job_total, self.machine_total
+        # opn = np.zeros(n, dtype=int)
+        # maxnum = self.data[1][0]
+        #
+        # for i in range(n):
+        #     now = 1
+        #     opn[i] = self.data[i + 1][0]
+        #     if maxnum < self.data[i + 1][0]:
+        #         maxnum = self.data[i + 1][0]
+        #
+        # opt = np.zeros((n, maxnum, m), dtype=int)
+        #
+        # for i in range(n):
+        #     # job i+1 ,[0] operation number,[1]
+        #     now = 1
+        #
+        #     for j in range(opn[i]):  # j is no. of operation
+        #         op_number = self.data[i + 1][now]  # numbers of machine of operation
+        #         now = now + 1
+        #
+        #         for kk in range(m):
+        #             opt[i][j][kk] = -1
+        #         for kk in range(op_number):
+        #             mac_n = self.data[i + 1][now] - 1
+        #
+        #             now = now + 1
+        #             opt[i][j][mac_n] = self.data[i + 1][now]
+        #             now = now + 1
 
-        for i in range(n):
-            now = 1
-            opn[i] = self.data[i+1][0]
-            if maxnum < self.data[i+1][0]:
-                maxnum = self.data[i+1][0]
-
-        opt = np.zeros((n,maxnum,m),dtype=int)
-
-        for i in range(n):
-            # job i+1 ,[0] operation number,[1] 
-            now = 1
-
-            for j in range(opn[i]): #j is no. of operation
-                op_number = self.data[i+1][now] # numbers of machine of operation
-                now = now + 1
-
-                for kk in range(m):
-                    opt[i][j][kk] = -1
-                for kk in range(op_number):
-                    mac_n = self.data[i+1][now]-1
-
-                    now = now + 1
-                    opt[i][j][mac_n] = self.data[i+1][now]
-                    now = now + 1
-
-        return opt, opn
+        return
 
     def is_illegal(self, action):
 
@@ -123,10 +178,10 @@ class JSSPEnv(gym.Env):
         then check if the machine is called by other jobs in this action
         """
 
-        machines_check = np.zeros(self.machines)
+        machines_check = np.zeros(self.machine_total)
 
-        for job in range(self.jobs):
-            
+        for job in range(self.job_total):
+
             if self.jobs_status[job] != -1 and action[job] != -1:
                 return True
 
@@ -144,7 +199,7 @@ class JSSPEnv(gym.Env):
                 machines_check[action_machine] = 1
 
         return False
-                    
+
     def step(self, action):
 
         if self.is_illegal(action):
@@ -153,9 +208,9 @@ class JSSPEnv(gym.Env):
         reward = -1
 
         # check if any operation is done
-        for job in range(self.jobs):
+        for job in range(self.job_total):
             job_data = self.jobs_history[job]
-            if job_data != []:
+            if job_data:
                 operation_data = job_data[-1]
                 if (self.jobs_status[job] != -1) and (self.time == operation_data[2]):
                     self.machines_status[self.jobs_history] = -1
@@ -163,11 +218,11 @@ class JSSPEnv(gym.Env):
                     self.jobs_finished_operations[job] += 1
 
         # update with actions
-        for job in range(self.jobs):
+        for job in range(self.job_total):
             if action[job] != -1:
                 o, m = self.jobs_finished_operations[job], action[job]
                 job_history = self.jobs_history[job]
-                job_history.append([m, self.time, self.time+self.operation_times[job][o][m]])
+                job_history.append([m, self.time, self.time + self.operation_times[job][o][m]])
                 self.jobs_history[job] = job_history
                 self.machines_status[m] = job
                 self.jobs_status[job] = o
@@ -186,12 +241,12 @@ class JSSPEnv(gym.Env):
 
     def reset(self):
 
-        self.jobs_history = [[] for _ in range(self.jobs)]
+        self.jobs_history = [[] for _ in range(self.job_total)]
         self.machines_status.fill(-1)
         self.time = 0
         self.jobs_left_operations = self.jobs_operations
-        self.jobs_finished_operations = np.array([0] * self.jobs)
-        self.jobs_status = np.array([-1] * self.jobs)
+        self.jobs_finished_operations = np.array([0] * self.job_total)
+        self.jobs_status = np.array([-1] * self.job_total)
 
         return self.get_obs()
 
@@ -199,7 +254,7 @@ class JSSPEnv(gym.Env):
 
         df = []
 
-        for job in range(self.jobs):
+        for job in range(self.job_total):
             for operation in self.jobs_history[job]:
                 dict_op = dict()
                 dict_op["Task"] = "Job {}".format(job)
