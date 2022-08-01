@@ -18,6 +18,15 @@ LEGAL_ACTIONS_INSTANCE1 = {
     0: np.array([0, 1]),
     1: np.array([0, 2])
 }
+LEGAL_ACTIONS_INSTANCE2 = {
+    0: np.array([1]),
+    1: np.array([])
+}
+ACTION_1 = np.array([2, -1])
+ACTION_2 = np.array([-1, 2])
+ACTION_3 = np.array([0, -1])
+ACTION_4 = np.array([0, 0])
+ACTION_5 = np.array([1, -1])
 
 
 def generate_env_var(instance_path):
@@ -71,19 +80,24 @@ class TestStringMethods(unittest.TestCase):
         for i in range(env.job_total):
             self.assertTrue(np.array_equal(legal_actions[i],
                                            LEGAL_ACTIONS_INSTANCE1[i]))
+        # send job 2 -> machine 1
+        env.state[env.job_machine_allocation] = [-1, 0]
+        legal_actions = env.get_legal_actions()
+        for i in range(env.job_total):
+            self.assertTrue(np.array_equal(legal_actions[i],
+                                           LEGAL_ACTIONS_INSTANCE2[i]))
 
-    def test_set_action_space(self):
-        assert False
+    def test_is_legal(self):
+        env = generate_env_var(INSTANCE1)
+        # send job 2 -> machine 1
+        env.state[env.job_machine_allocation] = [-1, 0]
+        self.assertTrue(not(env.is_legal(ACTION_1)))
+        self.assertTrue(not(env.is_legal(ACTION_2)))
+        self.assertTrue(not(env.is_legal(ACTION_3)))
+        self.assertTrue(not(env.is_legal(ACTION_4)))
+        self.assertTrue(env.is_legal(ACTION_5))
 
-    def test_get_machines_status(self):
-        assert False
 
-    def test_get_operation(self):
-        assert False
-
-    def test_is_illegal(self):
-
-        assert False
 
     def test_step(self):
         assert False

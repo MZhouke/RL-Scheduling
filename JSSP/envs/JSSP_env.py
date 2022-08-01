@@ -110,7 +110,7 @@ class JSSPEnv(gym.Env):
 
     def get_obs(self):
         """
-        :return: observation from the current action consisting of two arrays
+        :return: observation from the current state consisting of two arrays
                 "job_allocation" : array of integers representing ith job's allocation
                 "current_operation" array of integers representing ith job's progress status (which operation it's on)
                 ex. {
@@ -127,103 +127,63 @@ class JSSPEnv(gym.Env):
     def get_legal_actions(self):
         """
         returns next available legal actions
+        legal actions requires:
+        1. machine operation pair is legal
+        2. job is not allocated
+        3. machine is not allocated
         :return: list of list of numbers
         ex. {
                 0: [0, 1]
-                1: [0, 2]
+                2: [0, 2]
         }
-        at current state,
+        at current state, all jobs haven't started
         for 1st job, machines 1, 2 are legal
-        for 2nd job, machines 1, 3 are legal
+        for 3rd job, machines 1, 3 are legal
         """
         legal_actions = {}
-        action_index = 0
+        job_index = 0
         for current_operation in self.state[self.job_operation_status]:
-            action_operation_machine_time = self.job_operation_map[action_index][current_operation]
-            legal_machines = np.array([i for i in range(self.machine_total) if action_operation_machine_time[i] > 0])
-            busy_machines = self.state[self.job_machine_allocation]
-            legal_actions[action_index] = np.array([i for i in legal_machines if i not in busy_machines])
-            action_index += 1
+            # retrieve the list of machines capable of current operation of the job
+            job_operation_machine_time = self.job_operation_map[job_index][current_operation]
+            legal_machines = np.array([i for i in range(self.machine_total)
+                                       if job_operation_machine_time[i] > 0])
+            job_machine_allocation = self.state[self.job_machine_allocation]
+            # legal actions requires:
+            # 1. machine operation pair is legal
+            # 2. job is not allocated
+            # 3. machine is not allocated
+            legal_actions[job_index] = np.array([i for i in legal_machines
+                                                 if job_machine_allocation[job_index] == -1
+                                                 if i not in job_machine_allocation])
+            job_index += 1
 
         return legal_actions
 
-    def set_action_space(self):
-
-        lowbdd = np.full(self.job_total, -1)
-        highbdd = np.full(self.job_total, self.machine_total - 1)
-        action_space = gym.spaces.Box(low=lowbdd, high=highbdd, dtype=int)
-
-        return action_space
-
-    def get_operation(self):
-        """
-        opn: operation no
-        opt: operation time
-        """
-        # n, m = self.job_total, self.machine_total
-        # opn = np.zeros(n, dtype=int)
-        # maxnum = self.data[1][0]
-        #
-        # for i in range(n):
-        #     now = 1
-        #     opn[i] = self.data[i + 1][0]
-        #     if maxnum < self.data[i + 1][0]:
-        #         maxnum = self.data[i + 1][0]
-        #
-        # opt = np.zeros((n, maxnum, m), dtype=int)
-        #
-        # for i in range(n):
-        #     # job i+1 ,[0] operation number,[1]
-        #     now = 1
-        #
-        #     for j in range(opn[i]):  # j is no. of operation
-        #         op_number = self.data[i + 1][now]  # numbers of machine of operation
-        #         now = now + 1
-        #
-        #         for kk in range(m):
-        #             opt[i][j][kk] = -1
-        #         for kk in range(op_number):
-        #             mac_n = self.data[i + 1][now] - 1
-        #
-        #             now = now + 1
-        #             opt[i][j][mac_n] = self.data[i + 1][now]
-        #             now = now + 1
-
-        return
-
-    def is_illegal(self, action):
-
+    def is_legal(self, action):
         """
         for each job,
-        first check if the job is busy while action calls it to go to a machine
-        then check if the called machine is busy
-        then check if the called machine match with the job current operation
-        then check if the machine is called by other jobs in this action
-        :param action:
-        :return:
+        legal actions requires:
+        1. machine operation pair is legal
+        2. job is not allocated
+        3. machine is not allocated
+        4. no duplicate job allocation
+        :param action: an array of integers representing action allocation
+                ex. [1, -1]
+                1st job -> 2nd machine
+                2nd job -> None
+        :return: bool = true iff the action is legal
         """
-
-        machines_check = np.zeros(self.machine_total)
-
+        legal_actions = self.get_legal_actions()
         for job in range(self.job_total):
-
-            if self.state[self.job_machine_allocation][job] != -1 and action[job] != -1:
-                return True
-
-            action_machine = action[job]
-            if action_machine in self.state[self.state[self.job_machine_allocation]]:
-                return True
-
-            current_op = self.jobs_finished_operations[job]
-            if self.operation_times[job][current_op][action_machine] == -1:
-                return True
-
-            if machines_check[action_machine] == 1:
-                return True
-            else:
-                machines_check[action_machine] = 1
-
-        return False
+            # if it's a job allocation
+            if action[job] >= 0:
+                # check first 3 conditions using get_legal_actions()
+                if action[job] not in legal_actions[job]:
+                    return False
+        # check for duplicate job allocation
+        if len(np.unique(action)) != len(action):
+            return False
+        return True
 
     def step(self, action):
 
