@@ -30,7 +30,7 @@ class JSSPEnv(gym.Env):
         ]
 
         # n x 1 array, each entry represents the action to the job, -1 means do nothing, m means go to machine m
-        self.action_space = self.set_action_space(self.jobs, self.machines)
+        self.action_space = self.set_action_space()
 
         self.observation_space = gym.spaces.Dict(
             {
@@ -63,8 +63,8 @@ class JSSPEnv(gym.Env):
 
     def set_action_space(self):
 
-        lowbdd = np.zeros(self.jobs+1).fill(-1)
-        highbdd = np.zeros(self.jobs+1).fill(self.machines-1)
+        lowbdd = np.full(self.jobs, -1)
+        highbdd = np.full(self.jobs, self.machines-1)
         action_space = gym.spaces.Box(low=lowbdd, high=highbdd, dtype = int)
 
         return action_space
@@ -130,7 +130,7 @@ class JSSPEnv(gym.Env):
             if self.jobs_status[job] != -1 and action[job] != -1:
                 return True
 
-            action_machine = action[job][1]
+            action_machine = action[job]
             if self.machines_status[action_machine] != -1:
                 return True
 
