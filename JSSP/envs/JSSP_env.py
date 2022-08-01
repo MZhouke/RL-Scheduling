@@ -3,6 +3,7 @@ import numpy as np
 import plotly.figure_factory as ff
 import pandas as pd
 import random
+import datetime
 
 class JSSPEnv(gym.Env):
     def __init__(self, env_data):
