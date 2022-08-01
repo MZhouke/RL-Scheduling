@@ -56,13 +56,14 @@ class TestStringMethods(unittest.TestCase):
     def test_get_obs(self):
         env = generate_env_var(INSTANCE1)
         observation = env.get_obs()
-        self.assertTrue(np.array_equal(observation["job_machine_allocation"],
+        self.assertTrue(np.array_equal(observation[env.job_machine_allocation],
                                        JOB_MACHINE_ALLOCATION_INSTANCE1))
-        self.assertTrue(np.array_equal(observation["job_operation_status"],
+        self.assertTrue(np.array_equal(observation[env.job_operation_status],
                                        JOB_OPERATION_STATUS_INSTANCE1))
 
     def test_get_legal_actions(self):
-        assert False
+        env = generate_env_var(INSTANCE1)
+
 
     def test_set_action_space(self):
         assert False

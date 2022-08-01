@@ -16,6 +16,8 @@ class JSSPEnv(gym.Env):
         """
 
         # initial values for variables used for instance
+        self.job_operation_status = 0
+        self.job_machine_allocation = 1
         # job_total is total # of jobs
         # machine_total is total # of machines
         # job operation map stores the description of the JSP
@@ -25,12 +27,12 @@ class JSSPEnv(gym.Env):
         # job_machine_allocation represents current allocation of jobs to machines, -1 = no allocation
         # job_operation_status represents the current operation each job is on
         self.state = {
-            "job_machine_allocation": np.negative(np.ones(self.job_total)),
-            "job_operation_status": np.zeros(self.job_total)
+            self.job_machine_allocation: np.negative(np.ones(self.job_total)),
+            self.job_operation_status: np.zeros(self.job_total)
         }
-
+        # used for rendering
         self.jobs_history = [[] for _ in range(self.job_total)]
-        self.machines_status = self.get_machines_status()
+
         self.time = 0
         self.operation_times, self.jobs_operations = [], []
         self.jobs_left_operations = self.jobs_operations
@@ -57,7 +59,11 @@ class JSSPEnv(gym.Env):
         """
         # input instance description for environment initialization
         instance_path = instance_path
-        file_handle = open(instance_path, 'r')
+        try:
+            file_handle = open(instance_path, 'r')
+        except OSError:
+            print("Could not open/read file:", file_handle)
+
         lines_list = file_handle.readlines()
         # first line consists of # of jobs in total, # of machines in total
         self.job_total, self.machine_total = [int(x) for x in lines_list[0].split()]
@@ -117,18 +123,22 @@ class JSSPEnv(gym.Env):
 
     def get_legal_actions(self):
         """
-        returns a list of n entries, each represent a job
-        for each entry it lists all machines legal to assign to the job
-        :return: list of n entries, each represent a job
+        returns next available legal actions
+        :return: list of list of numbers
+        ex. {
+                0: [0, 1]
+                1: [0, 2]
+        }
+        at current state,
+        for 1st job, machines 1, 2 are legal
+        for 2nd job, machines 1, 3 are legal
         """
-        legal_actions = []
-
-        for job in range(self.job_total):
-            if self.job_machine_allocation[job] == -1:
-                legal_actions.append([])
-            else:
-                legal_action = list(np.where(self.operation_times[job][self.job_machine_allocation[job]] != -1)[0])
-                legal_actions.append(legal_action)
+        action_index = 0
+        legal_actions = {}
+        for current_operation in self.state[self.job_operation_status]:
+            legal_machines = self.job_operation_map[action_index][current_operation]
+            busy_machines = self.state[self.job_machine_allocation]
+            legal_actions[action_index] = np.array([i for i in legal_machines not in busy_machines])
 
         return legal_actions
 
@@ -139,13 +149,6 @@ class JSSPEnv(gym.Env):
         action_space = gym.spaces.Box(low=lowbdd, high=highbdd, dtype=int)
 
         return action_space
-
-    def get_machines_status(self):
-        """
-        -1 means unoccupied
-        other number(eg. i) means occupied by i-th job
-        """
-        return np.array([-1] * self.machine_total)
 
     def get_operation(self):
         """
@@ -199,11 +202,11 @@ class JSSPEnv(gym.Env):
 
         for job in range(self.job_total):
 
-            if self.job_machine_allocation[job] != -1 and action[job] != -1:
+            if self.state[self.job_machine_allocation][job] != -1 and action[job] != -1:
                 return True
 
             action_machine = action[job]
-            if self.machines_status[action_machine] != -1:
+            if action_machine in self.state[self.state[self.job_machine_allocation]]:
                 return True
 
             current_op = self.jobs_finished_operations[job]
@@ -229,9 +232,8 @@ class JSSPEnv(gym.Env):
             job_data = self.jobs_history[job]
             if job_data:
                 operation_data = job_data[-1]
-                if (self.job_machine_allocation[job] != -1) and (self.time == operation_data[2]):
-                    self.machines_status[self.jobs_history] = -1
-                    self.job_machine_allocation[job] = -1
+                if (self.state[self.job_machine_allocation][job] != -1) and (self.time == operation_data[2]):
+                    self.state[self.job_machine_allocation][job] = -1
                     self.jobs_finished_operations[job] += 1
 
         # update with actions
@@ -241,8 +243,7 @@ class JSSPEnv(gym.Env):
                 job_history = self.jobs_history[job]
                 job_history.append([m, self.time, self.time + self.operation_times[job][o][m]])
                 self.jobs_history[job] = job_history
-                self.machines_status[m] = job
-                self.job_machine_allocation[job] = o
+                self.self.state[self.job_machine_allocation][job] = o
                 self.jobs_left_operations[job] -= 1
 
         # update time
@@ -259,11 +260,10 @@ class JSSPEnv(gym.Env):
     def reset(self):
 
         self.jobs_history = [[] for _ in range(self.job_total)]
-        self.machines_status.fill(-1)
         self.time = 0
         self.jobs_left_operations = self.jobs_operations
         self.jobs_finished_operations = np.array([0] * self.job_total)
-        self.job_machine_allocation = np.negative(np.ones(self.job_total))
+        self.self.state[self.job_machine_allocation] = np.negative(np.ones(self.job_total))
 
         return self.get_obs()
 
