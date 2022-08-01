@@ -16,7 +16,6 @@ JOB_MACHINE_ALLOCATION_INSTANCE1 = np.array([-1, -1])
 JOB_OPERATION_STATUS_INSTANCE1 = np.array([0, 0])
 
 
-
 def generate_env_var(instance_path):
     env_name = "JSSP-v0"
     env = gym.make(env_name, instance_path=instance_path)

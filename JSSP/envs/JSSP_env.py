@@ -73,6 +73,7 @@ class JSSPEnv(gym.Env):
                 self.job_operation_map[job_index][operation_index] = np.negative(np.ones(self.machine_total))
             # populate job_description_map
             self.populate_job_description_map(job_description, job_index)
+        file_handle.close()
 
     def populate_job_description_map(self, job_description, job_index):
         """
