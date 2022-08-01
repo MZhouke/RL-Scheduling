@@ -21,14 +21,14 @@ class JSSPEnv(gym.Env):
         self.time = 0
         self.operation_times, self.jobs_operations= self.get_operation()
         self.jobs_left_operations = self.jobs_operations
-        self.jobs_finished_operations = [0] * self.jobs
+        self.jobs_finished_operations = np.array([0] * self.jobs)
         self.jobs_status = np.array([-1] * self.jobs)
         # used for plotting
         self.colors = [
             tuple([random.random() for _ in range(3)]) for _ in range(self.machines)
         ]
 
-        # each row representing one job. The first entry represents whether the job is activated or not, and the second entry represents the machine it assisngs
+        # n x 1 array, each entry represents the action to the job, -1 means do nothing, m means go to machine m
         self.action_space = self.set_action_space(self.jobs, self.machines)
 
         self.observation_space = gym.spaces.Dict(
@@ -60,12 +60,10 @@ class JSSPEnv(gym.Env):
 
         return legal_actions
 
-    def set_action_space(self, jobs, machines):
+    def set_action_space(self):
 
-        lowbdd = np.zeros((jobs, 2))
-        highbdd = np.zeros((jobs,2))
-        highbdd[:,0] = np.ones(jobs)
-        highbdd[:,1] = np.array([machines]*jobs)
+        lowbdd = np.zeros(self.jobs+1).fill(-1)
+        highbdd = np.zeros(self.jobs+1).fill(self.machines-1)
         action_space = gym.spaces.Box(low=lowbdd, high=highbdd, dtype = int)
 
         return action_space
@@ -114,30 +112,65 @@ class JSSPEnv(gym.Env):
 
         return opt, opn
 
+    def is_illegal(self, action):
+
+        """
+        for each job,
+        first check if the job is busy while action calls it to go to a machine
+        then check if the called machine is busy
+        then check if the called machine match with the job current operation
+        then check if the machine is called by other jobs in this action
+        """
+
+        machines_check = np.zeros(self.machines)
+
+        for job in range(self.jobs):
+            
+            if self.jobs_status[job] != -1 and action[job] != -1:
+                return True
+
+            action_machine = action[job][1]
+            if self.machines_status[action_machine] != -1:
+                return True
+
+            current_op = self.jobs_finished_operations[job]
+            if self.operation_times[job][current_op][action_machine] == -1:
+                return True
+
+            if machines_check[action_machine] == 1:
+                return True
+            else:
+                machines_check[action_machine] = 1
+
+        return False
+                    
     def step(self, action):
+
+        if self.is_illegal(action):
+            return self.get_obs(), np.NINF, False, {}
 
         reward = -1
 
         # check if any operation is done
         for job in range(self.jobs):
             job_data = self.jobs_history[job]
-            operation_data = job_data[-1]
-            if (self.jobs_status[job] != -1) and (self.time == operation_data[2]):
-                self.machines_status[self.jobs_history] = -1
-                self.jobs_status[job] = -1
-                self.jobs_finished_operations[job] += 1
+            if job_data != []:
+                operation_data = job_data[-1]
+                if (self.jobs_status[job] != -1) and (self.time == operation_data[2]):
+                    self.machines_status[self.jobs_history] = -1
+                    self.jobs_status[job] = -1
+                    self.jobs_finished_operations[job] += 1
 
         # update with actions
-        for job in range(len(action)):
-            if action[job][0] == 1:
-                o, m = self.jobs_left_operations, action[job][1]
-                if self.operation_times[job][o][m]!=-1 and self.machines_status[m]==-1:
-                    job_history = self.jobs_history[job]
-                    job_history.append([m, self.time, self.time+self.operation_times[job][o][m]])
-                    self.jobs_history[job] = job_history
-                    self.machines_status[m] = job
-                    self.jobs_status[job] = o
-                    self.jobs_left_operations[job] -= 1
+        for job in range(self.jobs):
+            if action[job] != -1:
+                o, m = self.jobs_finished_operations[job], action[job]
+                job_history = self.jobs_history[job]
+                job_history.append([m, self.time, self.time+self.operation_times[job][o][m]])
+                self.jobs_history[job] = job_history
+                self.machines_status[m] = job
+                self.jobs_status[job] = o
+                self.jobs_left_operations[job] -= 1
 
         # update time
         self.time += 1
@@ -148,7 +181,7 @@ class JSSPEnv(gym.Env):
             reward = 0
             self.time -= 1
 
-        return self.get_obs(), reward, done, []
+        return self.get_obs(), reward, done, {}
 
     def reset(self):
 
@@ -156,8 +189,8 @@ class JSSPEnv(gym.Env):
         self.machines_status.fill(-1)
         self.time = 0
         self.jobs_left_operations = self.jobs_operations
-        self.jobs_finished_operations = [0] * self.jobs
-        self.jobs_status = [-1] * self.jobs
+        self.jobs_finished_operations = np.array([0] * self.jobs)
+        self.jobs_status = np.array([-1] * self.jobs)
 
         return self.get_obs()
 

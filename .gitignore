@@ -1,3 +1,5 @@
 /ppo_cartpole.zip
 /dqn_cartpole.zip
 /a2c_cartpole.zip
+.DS_Store
+.vscode/
