@@ -12,6 +12,9 @@ MACHINE_TOTAL_INSTANCE1 = 3
 OPERATION_LEN_INSTANCE1 = [2, 3]
 JOB_DESCRIPTION_INSTANCE2 = [2, 3, 1, 10, 2, 15, 3, 8, 2, 2, 10, 3, 18]
 JOB_INDEX_1 = 0
+JOB_MACHINE_ALLOCATION_INSTANCE1 = np.array([-1, -1])
+JOB_OPERATION_STATUS_INSTANCE1 = np.array([0, 0])
+
 
 
 def generate_env_var(instance_path):
@@ -52,7 +55,12 @@ class TestStringMethods(unittest.TestCase):
                                     env.job_operation_map)
 
     def test_get_obs(self):
-        assert False
+        env = generate_env_var(INSTANCE1)
+        observation = env.get_obs()
+        self.assertTrue(np.array_equal(observation["job_machine_allocation"],
+                                       JOB_MACHINE_ALLOCATION_INSTANCE1))
+        self.assertTrue(np.array_equal(observation["job_operation_status"],
+                                       JOB_OPERATION_STATUS_INSTANCE1))
 
     def test_get_legal_actions(self):
         assert False
@@ -67,6 +75,7 @@ class TestStringMethods(unittest.TestCase):
         assert False
 
     def test_is_illegal(self):
+
         assert False
 
     def test_step(self):
