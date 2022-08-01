@@ -5,9 +5,13 @@ import numpy as np
 INSTANCE1 = "instance1.txt"
 OPERATION_MAP_INSTANCE1 = {0: {0: np.array([10, 15, -1]), 1: np.array([-1, 12, 18])},
                            1: {0: np.array([10, -1, 25]), 1: np.array([25, 18, -1]), 2: np.array([-1, 15, 25])}}
+OPERATION_MAP_INSTANCE2 = {0: {0: np.array([10, 15, 8]), 1: np.array([-1, 10, 18])},
+                           1: {0: np.array([10, -1, 25]), 1: np.array([25, 18, -1]), 2: np.array([-1, 15, 25])}}
 JOB_TOTAL_INSTANCE1 = 2
 MACHINE_TOTAL_INSTANCE1 = 3
 OPERATION_LEN_INSTANCE1 = [2, 3]
+JOB_DESCRIPTION_INSTANCE2 = [2, 3, 1, 10, 2, 15, 3, 8, 2, 2, 10, 3, 18]
+JOB_INDEX_1 = 0
 
 
 def generate_env_var(instance_path):
@@ -29,6 +33,7 @@ class TestStringMethods(unittest.TestCase):
 
     def test_initialize(self):
         env = generate_env_var(INSTANCE1)
+        env.initialize(INSTANCE1)
         self.assertEqual(env.job_total, JOB_TOTAL_INSTANCE1)
         self.assertEqual(env.machine_total, MACHINE_TOTAL_INSTANCE1)
         self.validate_operation_map(JOB_TOTAL_INSTANCE1,
@@ -38,7 +43,13 @@ class TestStringMethods(unittest.TestCase):
                                     env.job_operation_map)
 
     def test_populate_job_description_map(self):
-        assert False
+        env = generate_env_var(INSTANCE1)
+        env.populate_job_description_map(JOB_DESCRIPTION_INSTANCE2, JOB_INDEX_1)
+        self.validate_operation_map(JOB_TOTAL_INSTANCE1,
+                                    OPERATION_LEN_INSTANCE1,
+                                    MACHINE_TOTAL_INSTANCE1,
+                                    OPERATION_MAP_INSTANCE2,
+                                    env.job_operation_map)
 
     def test_get_obs(self):
         assert False
