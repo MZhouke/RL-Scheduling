@@ -14,6 +14,10 @@ JOB_DESCRIPTION_INSTANCE2 = [2, 3, 1, 10, 2, 15, 3, 8, 2, 2, 10, 3, 18]
 JOB_INDEX_1 = 0
 JOB_MACHINE_ALLOCATION_INSTANCE1 = np.array([-1, -1])
 JOB_OPERATION_STATUS_INSTANCE1 = np.array([0, 0])
+LEGAL_ACTIONS_INSTANCE1 = {
+    0: np.array([0, 1]),
+    1: np.array([0, 2])
+}
 
 
 def generate_env_var(instance_path):
@@ -63,7 +67,10 @@ class TestStringMethods(unittest.TestCase):
 
     def test_get_legal_actions(self):
         env = generate_env_var(INSTANCE1)
-
+        legal_actions = env.get_legal_actions()
+        for i in range(env.job_total):
+            self.assertTrue(np.array_equal(legal_actions[i],
+                                           LEGAL_ACTIONS_INSTANCE1[i]))
 
     def test_set_action_space(self):
         assert False

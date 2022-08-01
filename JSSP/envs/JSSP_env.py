@@ -43,7 +43,10 @@ class JSSPEnv(gym.Env):
         ]
 
         # n x 1 array, each entry represents the action to the job, -1 means do nothing, m means go to machine m
-        self.action_space = self.set_action_space()
+        lowbdd = np.full(self.job_total, -1)
+        highbdd = np.full(self.job_total, self.machine_total - 1)
+        action_space = gym.spaces.Box(low=lowbdd, high=highbdd, dtype=int)
+        self.action_space = self.action_space
 
         # self.observation_space = gym.spaces.Dict(
         #     {
@@ -133,12 +136,14 @@ class JSSPEnv(gym.Env):
         for 1st job, machines 1, 2 are legal
         for 2nd job, machines 1, 3 are legal
         """
-        action_index = 0
         legal_actions = {}
+        action_index = 0
         for current_operation in self.state[self.job_operation_status]:
-            legal_machines = self.job_operation_map[action_index][current_operation]
+            action_operation_machine_time = self.job_operation_map[action_index][current_operation]
+            legal_machines = np.array([i for i in range(self.machine_total) if action_operation_machine_time[i] > 0])
             busy_machines = self.state[self.job_machine_allocation]
-            legal_actions[action_index] = np.array([i for i in legal_machines not in busy_machines])
+            legal_actions[action_index] = np.array([i for i in legal_machines if i not in busy_machines])
+            action_index += 1
 
         return legal_actions
 
