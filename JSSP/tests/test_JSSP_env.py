@@ -2,6 +2,7 @@ import unittest
 import gym
 import numpy as np
 
+INSTANCE1 = "instance1.txt"
 OPERATION_MAP_INSTANCE1 = {0: {0: np.array([10, 15, -1]), 1: np.array([-1, 12, 18])},
                            1: {0: np.array([10, -1, 25]), 1: np.array([25, 18, -1]), 2: np.array([-1, 15, 25])}}
 JOB_TOTAL_INSTANCE1 = 2
@@ -27,7 +28,7 @@ class TestStringMethods(unittest.TestCase):
                                      )
 
     def test_initialize(self):
-        env = generate_env_var("instance1.txt")
+        env = generate_env_var(INSTANCE1)
         self.assertEqual(env.job_total, JOB_TOTAL_INSTANCE1)
         self.assertEqual(env.machine_total, MACHINE_TOTAL_INSTANCE1)
         self.validate_operation_map(JOB_TOTAL_INSTANCE1,
