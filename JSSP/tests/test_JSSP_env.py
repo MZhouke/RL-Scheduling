@@ -3,6 +3,8 @@ import gym
 import numpy as np
 
 INSTANCE1 = "instance1.txt"
+INSTANCE3 = "instance3.txt"
+INSTANCE4 = "instance4.txt"
 OPERATION_MAP_INSTANCE1 = {0: {0: np.array([10, 15, -1]), 1: np.array([-1, 12, 18])},
                            1: {0: np.array([10, -1, 25]), 1: np.array([25, 18, -1]), 2: np.array([-1, 15, 25])}}
 OPERATION_MAP_INSTANCE2 = {0: {0: np.array([10, 15, 8]), 1: np.array([-1, 10, 18])},
