@@ -9,6 +9,12 @@ OPERATION_MAP_INSTANCE2 = {0: {0: np.array([10, 15, 8]), 1: np.array([-1, 10, 18
                            1: {0: np.array([10, -1, 25]), 1: np.array([25, 18, -1]), 2: np.array([-1, 15, 25])}}
 JOB_TOTAL_INSTANCE1 = 2
 MACHINE_TOTAL_INSTANCE1 = 3
+UPPER_ACTION_INSTANCE1 = 2
+LOWER_ACTION_INSTANCE1 = -1
+UPPER_ALLOCATION_INSTANCE1 = 2
+LOWER_ALLOCATION_INSTANCE1 = -2
+UPPER_OPERATION_INSTANCE1 = 2
+LOWER_OPERATION_INSTANCE1 = 0
 OPERATION_LEN_INSTANCE1 = np.array([2, 3])
 JOB_DESCRIPTION_INSTANCE2 = np.array([2, 3, 1, 10, 2, 15, 3, 8, 2, 2, 10, 3, 18])
 JOB_INDEX_1 = 0
@@ -74,6 +80,27 @@ class TestStringMethods(unittest.TestCase):
                                     MACHINE_TOTAL_INSTANCE1,
                                     OPERATION_MAP_INSTANCE2,
                                     env.job_operation_map)
+
+    def test_initialize_action_space(self):
+        env = generate_env_var(INSTANCE1)
+        for i in range(20):
+            sample_action = env.action_space.sample()
+            print(sample_action)
+            self.assertTrue(np.all(sample_action <= UPPER_ACTION_INSTANCE1))
+            self.assertTrue(np.all(sample_action >= LOWER_ACTION_INSTANCE1))
+
+    def test_initialize_obs_space(self):
+        env = generate_env_var(INSTANCE1)
+        for i in range(20):
+            sample_observation = env.observation_space.sample()
+            self.assertTrue(np.all(sample_observation[env.job_machine_allocation]
+                                   <= UPPER_ALLOCATION_INSTANCE1))
+            self.assertTrue(np.all(sample_observation[env.job_machine_allocation]
+                                   >= LOWER_ALLOCATION_INSTANCE1))
+            self.assertTrue(np.all(sample_observation[env.job_operation_status]
+                                   <= UPPER_OPERATION_INSTANCE1))
+            self.assertTrue(np.all(sample_observation[env.job_operation_status]
+                                   >= LOWER_OPERATION_INSTANCE1))
 
     def test_get_obs(self):
         env = generate_env_var(INSTANCE1)
@@ -173,8 +200,6 @@ class TestStringMethods(unittest.TestCase):
         self.assertEqual(env.time, 1)
         self.assertFalse(done_2)
 
-
-
     def test_reset(self):
         env = generate_env_var(INSTANCE1)
         initial_observation = env.reset()
@@ -186,7 +211,6 @@ class TestStringMethods(unittest.TestCase):
                                        JOB_OPERATION_STATUS_INSTANCE1))
         self.assertTrue(np.array_equal(env.job_finish_time,
                                        JOB_FINISH_TIME_INSTANCE1))
-
 
 
 if __name__ == '__main__':

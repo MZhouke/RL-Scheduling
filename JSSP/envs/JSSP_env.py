@@ -19,41 +19,31 @@ class JSSPEnv(gym.Env):
         self.illegal_reward = -100000
         self.job_operation_status = 0
         self.job_machine_allocation = 1
+        # variable that represents the most operation an action can have
+        # used for creating observation space
+        self.max_operation_count = 0
         # job_total is total # of jobs
         # machine_total is total # of machines
         # job operation map stores the description of the JSP
         self.job_total, self.machine_total, self.job_operation_map = 0, 0, {}
         self.initialize(instance_path)
+        self.initialize_action_space()
+        self.initialize_obs_space()
         # current state of the environment
-        # job_machine_allocation represents current allocation of jobs to machines, -1 = no allocation
-        # job_operation_status represents the current operation each job is on
         self.state = {
             self.job_machine_allocation: np.negative(np.ones(self.job_total)),
             self.job_operation_status: np.zeros(self.job_total),
         }
         # job_finish_time represents finishing time of current job's operation
         self.job_finish_time = np.zeros(self.job_total)
+        # time step of current state
+        self.time = 0
         # used for rendering
         self.jobs_history = [[] for _ in range(self.job_total)]
-
-        self.time = 0
         # used for plotting
         self.colors = [
             tuple([random.random() for _ in range(3)]) for _ in range(self.machine_total)
         ]
-
-        # n x 1 array, each entry represents the action to the job, -1 means do nothing, m means go to machine m
-        lowbdd = np.full(self.job_total, -1)
-        highbdd = np.full(self.job_total, self.machine_total - 1)
-        action_space = gym.spaces.Box(low=lowbdd, high=highbdd, dtype=int)
-        self.action_space = action_space
-
-        # self.observation_space = gym.spaces.Dict(
-        #     {
-        #         "active": gym.spaces.Box(low=np.zeros(self.job_total), high=np.ones(self.job_total), dtype=int),
-        #         "left_operations": gym.spaces.Box(low=np.ones(self.job_total), high=self.jobs_left_operations, dtype=int),
-        #     }
-        # )
 
     def initialize(self, instance_path):
         """
@@ -75,6 +65,7 @@ class JSSPEnv(gym.Env):
         for job_index in range(len(lines_list) - 1):
             job_description = np.array([int(val) for val in lines_list[job_index + 1].split()])
             self.job_operation_map[job_index] = {}
+            self.max_operation_count = max(self.max_operation_count, job_description[0])
             # initialize job_operation_map
             # ex. job_operation_map[1][2][3] = time it takes for 3rd machine to execute 2nd operation of 1st job
             # time = -1 iff the machine is not capable of executing the operation based on instance description
@@ -111,9 +102,55 @@ class JSSPEnv(gym.Env):
     def update_time(self):
         self.time += 1
 
+    def initialize_action_space(self):
+        """
+        action: array of length job_total, each entry represents the job allocation to a machine,
+                -1 means do nothing, m means go to machine m
+                ex. [1, -1]
+                1st job -> 2nd machine
+                2nd job -> None
+        """
+        # [] of length job_total, each entry represents the job allocation to a machine,
+        # -1 means do nothing, m means go to machine m
+        lower_bound_action_space = np.full(self.job_total, -1)
+        upper_bound_action_space = np.full(self.job_total, self.machine_total - 1)
+        self.action_space = gym.spaces.Box(low=lower_bound_action_space,
+                                           high=upper_bound_action_space,
+                                           dtype=np.int)
+
+    def initialize_obs_space(self):
+        """
+            observation: dictionary of two entries:
+                        "job_machine_allocation" : array of integers representing ith job's allocation
+                                    -1 represents an empty allocation
+                                    -2 represents a finished job
+                        "job_operation_status" : array of integers representing ith job's current operation status
+                        ex. {
+                                job_machine_allocation: [-1,0,1]
+                                job_operation_status: [0,0,1]
+                            }
+                        job 1 (operation 1) -> None
+                        job 2 (operation 1) -> machine 1
+                        job 3 (operation 2) -> machine 2
+        """
+        lower_bound_obs_space_allocation = np.full(self.job_total, -2)
+        upper_bound_obs_space_allocation = np.full(self.job_total, self.machine_total - 1)
+        lower_bound_obs_space_operation = np.full(self.job_total, 0)
+        upper_bound_obs_space_operation = np.full(self.job_total, self.max_operation_count - 1)
+        self.observation_space = gym.spaces.Dict(
+            {
+                self.job_machine_allocation: gym.spaces.Box(low=lower_bound_obs_space_allocation,
+                                                            high=upper_bound_obs_space_allocation,
+                                                            dtype=np.int),
+                self.job_operation_status: gym.spaces.Box(low=lower_bound_obs_space_operation,
+                                                          high=upper_bound_obs_space_operation,
+                                                          dtype=int),
+            }
+        )
+
     def get_obs(self):
         """
-        :return: observation from the current state consisting of 3 arrays
+        :return: observation from the current state consisting of 2 arrays
                 "job_machine_allocation" : array of integers representing ith job's allocation
                                     -1 represents an empty allocation
                                     -2 represents a finished job
