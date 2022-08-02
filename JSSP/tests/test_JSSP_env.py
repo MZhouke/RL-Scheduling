@@ -1,5 +1,6 @@
 import unittest
 import gym
+import JSSP
 import numpy as np
 
 INSTANCE1 = "instance1.txt"
