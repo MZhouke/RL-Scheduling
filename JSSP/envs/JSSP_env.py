@@ -16,44 +16,34 @@ class JSSPEnv(gym.Env):
         """
 
         # initial values for variables used for instance
+        self.illegal_reward = -100000
         self.job_operation_status = 0
         self.job_machine_allocation = 1
+        # variable that represents the most operation an action can have
+        # used for creating observation space
+        self.max_operation_count = 0
         # job_total is total # of jobs
         # machine_total is total # of machines
         # job operation map stores the description of the JSP
         self.job_total, self.machine_total, self.job_operation_map = 0, 0, {}
         self.initialize(instance_path)
-        # current state the environment is at
-        # job_machine_allocation represents current allocation of jobs to machines, -1 = no allocation
-        # job_operation_status represents the current operation each job is on
+        self.initialize_action_space()
+        self.initialize_obs_space()
+        # current state of the environment
         self.state = {
             self.job_machine_allocation: np.negative(np.ones(self.job_total)),
-            self.job_operation_status: np.zeros(self.job_total)
+            self.job_operation_status: np.zeros(self.job_total),
         }
+        # job_finish_time represents finishing time of current job's operation
+        self.job_finish_time = np.zeros(self.job_total)
+        # time step of current state
+        self.time = 0
         # used for rendering
         self.jobs_history = [[] for _ in range(self.job_total)]
-
-        self.time = 0
-        self.operation_times, self.jobs_operations = [], []
-        self.jobs_left_operations = self.jobs_operations
-        self.jobs_finished_operations = np.array([0] * self.job_total)
         # used for plotting
         self.colors = [
             tuple([random.random() for _ in range(3)]) for _ in range(self.machine_total)
         ]
-
-        # n x 1 array, each entry represents the action to the job, -1 means do nothing, m means go to machine m
-        lowbdd = np.full(self.job_total, -1)
-        highbdd = np.full(self.job_total, self.machine_total - 1)
-        action_space = gym.spaces.Box(low=lowbdd, high=highbdd, dtype=int)
-        self.action_space = self.action_space
-
-        # self.observation_space = gym.spaces.Dict(
-        #     {
-        #         "active": gym.spaces.Box(low=np.zeros(self.job_total), high=np.ones(self.job_total), dtype=int),
-        #         "left_operations": gym.spaces.Box(low=np.ones(self.job_total), high=self.jobs_left_operations, dtype=int),
-        #     }
-        # )
 
     def initialize(self, instance_path):
         """
@@ -65,7 +55,7 @@ class JSSPEnv(gym.Env):
         try:
             file_handle = open(instance_path, 'r')
         except OSError:
-            print("Could not open/read file:", file_handle)
+            print("Could not open/read file:", instance_path)
 
         lines_list = file_handle.readlines()
         # first line consists of # of jobs in total, # of machines in total
@@ -73,8 +63,9 @@ class JSSPEnv(gym.Env):
         # env_data = [[int(val) for val in line.split()] for line in lines_list[1:]]
         # read through each job description
         for job_index in range(len(lines_list) - 1):
-            job_description = [int(val) for val in lines_list[job_index + 1].split()]
+            job_description = np.array([int(val) for val in lines_list[job_index + 1].split()])
             self.job_operation_map[job_index] = {}
+            self.max_operation_count = max(self.max_operation_count, job_description[0])
             # initialize job_operation_map
             # ex. job_operation_map[1][2][3] = time it takes for 3rd machine to execute 2nd operation of 1st job
             # time = -1 iff the machine is not capable of executing the operation based on instance description
@@ -108,18 +99,86 @@ class JSSPEnv(gym.Env):
                 description_pivot += 2
             operation_index += 1
 
+    def update_time(self):
+        self.time += 1
+
+    def initialize_action_space(self):
+        """
+        action: array of length job_total, each entry represents the job allocation to a machine,
+                -1 means do nothing, m means go to machine m
+                ex. [1, -1]
+                1st job -> 2nd machine
+                2nd job -> None
+        """
+        # [] of length job_total, each entry represents the job allocation to a machine,
+        # -1 means do nothing, m means go to machine m
+        lower_bound_action_space = np.full(self.job_total, -1)
+        upper_bound_action_space = np.full(self.job_total, self.machine_total - 1)
+        self.action_space = gym.spaces.Box(low=lower_bound_action_space,
+                                           high=upper_bound_action_space,
+                                           dtype=np.int)
+
+    def update_action_space_when_wait(self):
+        """
+        when no jobs or machines are free, change the action_space to only accept -1
+        """
+        # [] of length job_total, each entry represents the job allocation to a machine,
+        # -1 means do nothing, m means go to machine m
+        lower_bound_action_space = np.full(self.job_total, -1)
+        self.action_space = gym.spaces.Box(low=lower_bound_action_space,
+                                           high=lower_bound_action_space,
+                                           dtype=np.int)
+
+
+    def initialize_obs_space(self):
+        """
+            observation: dictionary of two entries:
+                        "job_machine_allocation" : array of integers representing ith job's allocation
+                                    -1 represents an empty allocation
+                                    -2 represents a finished job
+                        "job_operation_status" : array of integers representing ith job's current operation status
+                        ex. {
+                                job_machine_allocation: [-1,0,1]
+                                job_operation_status: [0,0,1]
+                            }
+                        job 1 (operation 1) -> None
+                        job 2 (operation 1) -> machine 1
+                        job 3 (operation 2) -> machine 2
+        """
+        lower_bound_obs_space_allocation = np.full(self.job_total, -2)
+        upper_bound_obs_space_allocation = np.full(self.job_total, self.machine_total - 1)
+        lower_bound_obs_space_operation = np.full(self.job_total, 0)
+        upper_bound_obs_space_operation = np.full(self.job_total, self.max_operation_count - 1)
+        self.observation_space = gym.spaces.Dict(
+            {
+                self.job_machine_allocation: gym.spaces.Box(low=lower_bound_obs_space_allocation,
+                                                            high=upper_bound_obs_space_allocation,
+                                                            dtype=np.int),
+                self.job_operation_status: gym.spaces.Box(low=lower_bound_obs_space_operation,
+                                                          high=upper_bound_obs_space_operation,
+                                                          dtype=int),
+            }
+        )
+
     def get_obs(self):
         """
-        :return: observation from the current state consisting of two arrays
-                "job_allocation" : array of integers representing ith job's allocation
-                "current_operation" array of integers representing ith job's progress status (which operation it's on)
+        :return: observation from the current state consisting of 2 arrays
+                "job_machine_allocation" : array of integers representing ith job's allocation
+                                    -1 represents an empty allocation
+                                    -2 represents a finished job
+                "job_operation_status" : array of integers representing ith job's current operation status
+
+
                 ex. {
-                        "job_allocation": [-1,0,1]
-                        "current_operations": [0,0,1]
+                        job_machine_allocation: [-1,0,1]
+                        job_operation_status: [0,0,1]
+
                     }
-                    job 1 (operation 1) -> None
-                    job 2 (operation 1) -> machine 1
-                    job 3 (operation 2) -> machine 2
+                    job_finish_time = [-1, 10, 18]
+
+                    job 1 (operation 1) -> None, finish time unknown
+                    job 2 (operation 1) -> machine 1, finish at timestep 10
+                    job 3 (operation 2) -> machine 2, finish at timestep 18
 
         """
         return self.state
@@ -136,7 +195,7 @@ class JSSPEnv(gym.Env):
                 0: [0, 1]
                 2: [0, 2]
         }
-        at current state, all jobs haven't started
+        at current state, jobs 1, 3 are free
         for 1st job, machines 1, 2 are legal
         for 3rd job, machines 1, 3 are legal
         """
@@ -146,11 +205,11 @@ class JSSPEnv(gym.Env):
             # retrieve the list of machines capable of current operation of the job
             job_operation_machine_time = self.job_operation_map[job_index][current_operation]
             legal_machines = np.array([i for i in range(self.machine_total)
-                                       if job_operation_machine_time[i] > 0])
+                                       if job_operation_machine_time[i] >= 0])
             job_machine_allocation = self.state[self.job_machine_allocation]
             # legal actions requires:
             # 1. machine operation pair is legal
-            # 2. job is not allocated
+            # 2. job is not allocated or finished
             # 3. machine is not allocated
             legal_actions[job_index] = np.array([i for i in legal_machines
                                                  if job_machine_allocation[job_index] == -1
@@ -161,10 +220,10 @@ class JSSPEnv(gym.Env):
 
     def is_legal(self, action):
         """
-        for each job,
+        for each job that contains allocation
         legal actions requires:
         1. machine operation pair is legal
-        2. job is not allocated
+        2. job is not allocated or finished
         3. machine is not allocated
         4. no duplicate job allocation
         :param action: an array of integers representing action allocation
@@ -173,6 +232,9 @@ class JSSPEnv(gym.Env):
                 2nd job -> None
         :return: bool = true iff the action is legal
         """
+        # check if the action is wait:
+        if np.all(action == -1):
+            return True
         legal_actions = self.get_legal_actions()
         for job in range(self.job_total):
             # if it's a job allocation
@@ -185,50 +247,91 @@ class JSSPEnv(gym.Env):
             return False
         return True
 
-    def step(self, action):
-
-        if self.is_illegal(action):
-            return self.get_obs(), np.NINF, False, {}
-
-        reward = -1
-
-        # check if any operation is done
+    def update_state(self, action):
+        """
+        update the state of the environment based on the given action
+        1. update allocation given by action
+        2. update timestep and check for completed jobs
+        :param action: an array of integers representing action allocation
+                ex. [1, -1]
+                1st job -> 2nd machine
+                2nd job -> None
+        """
+        # 1. update allocation given by action
         for job in range(self.job_total):
-            job_data = self.jobs_history[job]
-            if job_data:
-                operation_data = job_data[-1]
-                if (self.state[self.job_machine_allocation][job] != -1) and (self.time == operation_data[2]):
+            current_operation = self.state[self.job_operation_status][job]
+            machine = action[job]
+            if machine >= 0:
+                # update the state job_machine_allocation
+                self.state[self.job_machine_allocation][job] = machine
+                # update the finish time and job_operation_status
+                current_operation_duration = self.job_operation_map[job][current_operation][machine]
+                self.job_finish_time[job] = self.time + current_operation_duration
+        # timestep increases by 1
+        self.update_time()
+        # 2. check for completed jobs
+        for job in range(self.job_total):
+            # if job is not finished nor empty
+            if self.state[self.job_machine_allocation][job] >= 0:
+                if 0 <= self.job_finish_time[job] <= self.time:
+                    # change job allocation to empty
                     self.state[self.job_machine_allocation][job] = -1
-                    self.jobs_finished_operations[job] += 1
+                    # update the operation status of the job
+                    current_operation = self.state[self.job_operation_status][job]
+                    next_operation = current_operation + 1
+                    # if job is not finished
+                    if next_operation in self.job_operation_map[job]:
+                        self.state[self.job_operation_status][job] = next_operation
+                    # if job is finished
+                    else:
+                        self.state[self.job_machine_allocation][job] = -2
 
-        # update with actions
-        for job in range(self.job_total):
-            if action[job] != -1:
-                o, m = self.jobs_finished_operations[job], action[job]
-                job_history = self.jobs_history[job]
-                job_history.append([m, self.time, self.time + self.operation_times[job][o][m]])
-                self.jobs_history[job] = job_history
-                self.self.state[self.job_machine_allocation][job] = o
-                self.jobs_left_operations[job] -= 1
 
-        # update time
-        self.time += 1
+    def step(self, action):
+        """
+            1. check if action is legal,
+                if not, return previous observation without updating time
+                illegal actions receive much smaller rewards to disencourage selection
+            2. update the state
+            3. check if all jobs are finished, if yes, return done <= TRUE
+            4. check if all jobs or machines are occupied, if yes, update action_space
+        :param action: an array of integers representing action allocation
+                ex. [1, -1]
+                1st job -> 2nd machine
+                2nd job -> None
+        :return:
+            observation: current state
+                ex. {
+                        job_machine_allocation: [-1,0]
+                        job_operation_status: [0,0]
 
-        done = np.all(self.jobs_finished_operations == self.jobs_operations)
+                    }
+            reward: -1 for any time step
+            done: boolean stating whether all jobs are finished
 
+        """
+        if not (self.is_legal(action)):
+            return self.get_obs(), self.illegal_reward, False, {}
+        reward = -1
+        self.update_state(action)
+        done = np.all(self.state[self.job_machine_allocation] == -2)
         if done:
             reward = 0
             self.time -= 1
+        if np.count_nonzero(self.state[self.job_machine_allocation] > -1) >= min(self.job_total, self.machine_total):
+            self.update_action_space_when_wait()
+        else:
+            self.initialize_action_space()
 
         return self.get_obs(), reward, done, {}
 
     def reset(self):
-
-        self.jobs_history = [[] for _ in range(self.job_total)]
+        self.state = {
+            self.job_machine_allocation: np.negative(np.ones(self.job_total)),
+            self.job_operation_status: np.zeros(self.job_total),
+        }
+        self.job_finish_time = np.zeros(self.job_total)
         self.time = 0
-        self.jobs_left_operations = self.jobs_operations
-        self.jobs_finished_operations = np.array([0] * self.job_total)
-        self.self.state[self.job_machine_allocation] = np.negative(np.ones(self.job_total))
 
         return self.get_obs()
 
