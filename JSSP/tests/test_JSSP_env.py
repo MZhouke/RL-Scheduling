@@ -85,7 +85,6 @@ class TestStringMethods(unittest.TestCase):
         env = generate_env_var(INSTANCE1)
         for i in range(20):
             sample_action = env.action_space.sample()
-            print(sample_action)
             self.assertTrue(np.all(sample_action <= UPPER_ACTION_INSTANCE1))
             self.assertTrue(np.all(sample_action >= LOWER_ACTION_INSTANCE1))
 
@@ -134,6 +133,7 @@ class TestStringMethods(unittest.TestCase):
         self.assertTrue(not (env.is_legal(ACTION_3)))
         self.assertTrue(not (env.is_legal(ACTION_4)))
         self.assertTrue(env.is_legal(ACTION_5))
+        self.assertTrue(env.is_legal(ACTION_WAIT))
 
     def test_update_state(self):
         env = generate_env_var(INSTANCE1)

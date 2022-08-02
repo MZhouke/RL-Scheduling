@@ -118,6 +118,18 @@ class JSSPEnv(gym.Env):
                                            high=upper_bound_action_space,
                                            dtype=np.int)
 
+    def update_action_space_when_wait(self):
+        """
+        when no jobs or machines are free, change the action_space to only accept -1
+        """
+        # [] of length job_total, each entry represents the job allocation to a machine,
+        # -1 means do nothing, m means go to machine m
+        lower_bound_action_space = np.full(self.job_total, -1)
+        self.action_space = gym.spaces.Box(low=lower_bound_action_space,
+                                           high=lower_bound_action_space,
+                                           dtype=np.int)
+
+
     def initialize_obs_space(self):
         """
             observation: dictionary of two entries:
@@ -208,7 +220,7 @@ class JSSPEnv(gym.Env):
 
     def is_legal(self, action):
         """
-        for each job,
+        for each job that contains allocation
         legal actions requires:
         1. machine operation pair is legal
         2. job is not allocated or finished
@@ -220,6 +232,9 @@ class JSSPEnv(gym.Env):
                 2nd job -> None
         :return: bool = true iff the action is legal
         """
+        # check if the action is wait:
+        if np.all(action == -1):
+            return True
         legal_actions = self.get_legal_actions()
         for job in range(self.job_total):
             # if it's a job allocation
@@ -271,9 +286,15 @@ class JSSPEnv(gym.Env):
                     else:
                         self.state[self.job_machine_allocation][job] = -2
 
+
     def step(self, action):
         """
-
+            1. check if action is legal,
+                if not, return previous observation without updating time
+                illegal actions receive much smaller rewards to disencourage selection
+            2. update the state
+            3. check if all jobs are finished, if yes, return done <= TRUE
+            4. check if all jobs or machines are occupied, if yes, update action_space
         :param action: an array of integers representing action allocation
                 ex. [1, -1]
                 1st job -> 2nd machine
@@ -291,16 +312,17 @@ class JSSPEnv(gym.Env):
         """
         if not (self.is_legal(action)):
             return self.get_obs(), self.illegal_reward, False, {}
-
         reward = -1
-
         self.update_state(action)
-
         done = np.all(self.state[self.job_machine_allocation] == -2)
-
         if done:
             reward = 0
             self.time -= 1
+        if np.count_nonzero(self.state[self.job_machine_allocation] > -1) \
+                >= min(self.job_total, self.machine_total):
+            self.update_action_space_when_wait()
+        else:
+            self.initialize_action_space()
 
         return self.get_obs(), reward, done, {}
 
