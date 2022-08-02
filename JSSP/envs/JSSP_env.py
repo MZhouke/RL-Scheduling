@@ -129,7 +129,6 @@ class JSSPEnv(gym.Env):
                                            high=lower_bound_action_space,
                                            dtype=np.int)
 
-
     def initialize_obs_space(self):
         """
             observation: dictionary of two entries:
@@ -193,10 +192,12 @@ class JSSPEnv(gym.Env):
         :return: list of list of numbers
         ex. {
                 0: [0, 1]
+                1: []
                 2: [0, 2]
         }
         at current state, jobs 1, 3 are free
         for 1st job, machines 1, 2 are legal
+        for 2nd job, no machines are free
         for 3rd job, machines 1, 3 are legal
         """
         legal_actions = {}
@@ -285,7 +286,6 @@ class JSSPEnv(gym.Env):
                     # if job is finished
                     else:
                         self.state[self.job_machine_allocation][job] = -2
-
 
     def step(self, action):
         """
