@@ -244,7 +244,8 @@ class JSSPEnv(gym.Env):
                 if action[job] not in legal_actions[job]:
                     return False
         # check for duplicate job allocation
-        if len(np.unique(action)) != len(action):
+        duplicate_check_list = [machine for machine in action if machine != -1]
+        if len(np.unique(duplicate_check_list)) != len(duplicate_check_list):
             return False
         return True
 
