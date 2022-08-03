@@ -4,6 +4,7 @@ import plotly.figure_factory as ff
 import pandas as pd
 import random
 import datetime
+import itertools
 
 
 class JSSPEnv(gym.Env):
@@ -16,7 +17,6 @@ class JSSPEnv(gym.Env):
         """
 
         # initial values for variables used for instance
-        self.illegal_reward = -100000
         self.job_operation_status = 0
         self.job_machine_allocation = 1
         # variable that represents the most operation an action can have
@@ -27,8 +27,6 @@ class JSSPEnv(gym.Env):
         # job operation map stores the description of the JSP
         self.job_total, self.machine_total, self.job_operation_map = 0, 0, {}
         self.initialize(instance_path)
-        self.initialize_action_space()
-        self.initialize_obs_space()
         # current state of the environment
         self.state = {
             self.job_machine_allocation: np.negative(np.ones(self.job_total)),
@@ -36,6 +34,11 @@ class JSSPEnv(gym.Env):
         }
         # job_finish_time represents finishing time of current job's operation
         self.job_finish_time = np.zeros(self.job_total)
+        # legal_allocation_list stores the list of actions at the current state
+        self.legal_allocation_list = []
+        self.generate_legal_allocation_list()
+        self.initialize_action_space()
+        self.initialize_obs_space()
         # time step of current state
         self.time = 0
         # used for rendering
@@ -104,30 +107,16 @@ class JSSPEnv(gym.Env):
 
     def initialize_action_space(self):
         """
-        action: array of length job_total, each entry represents the job allocation to a machine,
-                -1 means do nothing, m means go to machine m
-                ex. [1, -1]
-                1st job -> 2nd machine
-                2nd job -> None
+        action: index of an allocation in the legal_allocation_list
+                last element is always wait action
+        legal_allocation_list: list of legal allocations at current state
+            ex. legal_allocation_list = [[0,-1], [-1, 1], [0, 1], [-1, -1]]
+                action = 2:
+                job 1 -> machine 1
+                job2 -> machine 2
         """
-        # [] of length job_total, each entry represents the job allocation to a machine,
-        # -1 means do nothing, m means go to machine m
-        lower_bound_action_space = np.full(self.job_total, -1)
-        upper_bound_action_space = np.full(self.job_total, self.machine_total - 1)
-        self.action_space = gym.spaces.Box(low=lower_bound_action_space,
-                                           high=upper_bound_action_space,
-                                           dtype=np.int)
-
-    def update_action_space_when_wait(self):
-        """
-        when no jobs or machines are free, change the action_space to only accept -1
-        """
-        # [] of length job_total, each entry represents the job allocation to a machine,
-        # -1 means do nothing, m means go to machine m
-        lower_bound_action_space = np.full(self.job_total, -1)
-        self.action_space = gym.spaces.Box(low=lower_bound_action_space,
-                                           high=lower_bound_action_space,
-                                           dtype=np.int)
+        legal_allocation_list_len = len(self.legal_allocation_list)
+        self.action_space = gym.spaces.Discrete(legal_allocation_list_len)
 
     def initialize_obs_space(self):
         """
@@ -182,10 +171,10 @@ class JSSPEnv(gym.Env):
         """
         return self.state
 
-    def get_legal_actions(self):
+    def get_legal_allocations(self):
         """
-        returns next available legal actions
-        legal actions requires:
+        returns next available legal allocations
+        legal allocations requires:
         1. machine operation pair is legal
         2. job is not allocated
         3. machine is not allocated
@@ -200,7 +189,7 @@ class JSSPEnv(gym.Env):
         for 2nd job, no machines are free
         for 3rd job, machines 1, 3 are legal
         """
-        legal_actions = {}
+        legal_allocations = []
         job_index = 0
         for current_operation in self.state[self.job_operation_status]:
             # retrieve the list of machines capable of current operation of the job
@@ -212,57 +201,50 @@ class JSSPEnv(gym.Env):
             # 1. machine operation pair is legal
             # 2. job is not allocated or finished
             # 3. machine is not allocated
-            legal_actions[job_index] = np.array([i for i in legal_machines
-                                                 if job_machine_allocation[job_index] == -1
-                                                 if i not in job_machine_allocation])
+            free_legal_machines = [i for i in legal_machines
+                                   if job_machine_allocation[job_index] == -1
+                                   if i not in job_machine_allocation]
+            free_legal_machines.append(-1)
+            legal_allocations.append(free_legal_machines)
             job_index += 1
 
-        return legal_actions
+        return legal_allocations
 
-    def is_legal(self, action):
+    def generate_legal_allocation_list(self):
         """
-        for each job that contains allocation
+        generates legal_action_allocation_list:
         legal actions requires:
         1. machine operation pair is legal
         2. job is not allocated or finished
         3. machine is not allocated
         4. no duplicate job allocation
-        :param action: an array of integers representing action allocation
-                ex. [1, -1]
-                1st job -> 2nd machine
-                2nd job -> None
-        :return: bool = true iff the action is legal
+        we check the first 3 conditions in get_legal_allocations
         """
-        # check if the action is wait:
-        if np.all(action == -1):
-            return True
-        legal_actions = self.get_legal_actions()
-        for job in range(self.job_total):
-            # if it's a job allocation
-            if action[job] >= 0:
-                # check first 3 conditions using get_legal_actions()
-                if action[job] not in legal_actions[job]:
-                    return False
-        # check for duplicate job allocation
-        duplicate_check_list = [machine for machine in action if machine != -1]
-        if len(np.unique(duplicate_check_list)) != len(duplicate_check_list):
-            return False
-        return True
+        legal_allocations = self.get_legal_allocations()
+        allocation_list = list(itertools.product(*legal_allocations))
+        legal_allocations_list = []
+        for allocation in allocation_list:
+            # check for duplicate job allocation
+            duplicate_check_list = [machine for machine in allocation if machine != -1]
+            if len(np.unique(duplicate_check_list)) == len(duplicate_check_list):
+                legal_allocations_list.append(np.array(allocation))
+        self.legal_allocation_list = legal_allocations_list
 
-    def update_state(self, action):
+    def update_state(self, allocation):
         """
-        update the state of the environment based on the given action
-        1. update allocation given by action
+        update the state of the environment based on the given allocation
+        1. update state[job_machine_allocation] and job_finish_time given by allocation
         2. update timestep and check for completed jobs
-        :param action: an array of integers representing action allocation
+        :param allocation: an array of integers representing allocation
+                index is job number, value is machine number
                 ex. [1, -1]
                 1st job -> 2nd machine
                 2nd job -> None
         """
-        # 1. update allocation given by action
+        # 1. update allocation given by allocation
         for job in range(self.job_total):
             current_operation = self.state[self.job_operation_status][job]
-            machine = action[job]
+            machine = allocation[job]
             if machine >= 0:
                 # update the state job_machine_allocation
                 self.state[self.job_machine_allocation][job] = machine
@@ -290,16 +272,13 @@ class JSSPEnv(gym.Env):
 
     def step(self, action):
         """
-            1. check if action is legal,
-                if not, return previous observation without updating time
-                illegal actions receive much smaller rewards to disencourage selection
-            2. update the state
-            3. check if all jobs are finished, if yes, return done <= TRUE
-            4. check if all jobs or machines are occupied, if yes, update action_space
-        :param action: an array of integers representing action allocation
-                ex. [1, -1]
-                1st job -> 2nd machine
-                2nd job -> None
+            1. update the state
+            2. check if all jobs are finished, if yes, return done = TRUE
+                when a job is finished
+                the corresponding entry in state[job_machine_allocation] = -2
+            3. update legal_allocation_list and action space accordingly
+        :param action: index of an allocation in the legal_allocation_list
+                last element is always wait action
         :return:
             observation: current state
                 ex. {
@@ -311,19 +290,15 @@ class JSSPEnv(gym.Env):
             done: boolean stating whether all jobs are finished
 
         """
-        if not (self.is_legal(action)):
-            return self.get_obs(), self.illegal_reward, False, {}
+        allocation = self.legal_allocation_list[action]
         reward = -1
-        self.update_state(action)
+        self.update_state(allocation)
         done = np.all(self.state[self.job_machine_allocation] == -2)
         if done:
-            reward = 0
             self.time -= 1
-        if np.count_nonzero(self.state[self.job_machine_allocation] > -1) >= min(self.job_total, self.machine_total):
-            self.update_action_space_when_wait()
-        else:
-            self.initialize_action_space()
-
+            return self.get_obs(), reward + 1, done, {}
+        self.generate_legal_allocation_list()
+        self.initialize_action_space()
         return self.get_obs(), reward, done, {}
 
     def reset(self):
@@ -332,6 +307,10 @@ class JSSPEnv(gym.Env):
             self.job_operation_status: np.zeros(self.job_total),
         }
         self.job_finish_time = np.zeros(self.job_total)
+        self.legal_allocation_list = []
+        self.generate_legal_allocation_list()
+        self.initialize_action_space()
+        self.initialize_obs_space()
         self.time = 0
 
         return self.get_obs()
@@ -367,3 +346,31 @@ class JSSPEnv(gym.Env):
             )  # otherwise tasks are listed from the bottom up
 
         return fig
+
+    def is_legal(self, allocation):
+        """
+        check if an allocation is legal
+        mainly used for testing
+        1. machine operation pair is legal
+        2. job is not allocated or finished
+        3. machine is not allocated
+        4. no duplicate job allocation
+        :param allocation: allocation: an array of integers representing allocation
+                index is job number, value is machine number
+                ex. [1, -1]
+                1st job -> 2nd machine
+                2nd job -> None
+        """
+        for job in range(self.job_total):
+            operation = self.state[self.job_operation_status][job]
+            if allocation[job] != -1:
+                if self.job_operation_map[job][operation][allocation[job]] < 0:
+                    return False
+                if self.state[self.job_machine_allocation][job] != -1:
+                    return False
+                if allocation[job] in self.state[self.job_machine_allocation]:
+                    return False
+        for machine in range(self.machine_total):
+            if np.count_nonzero(allocation == machine) > 1:
+                return False
+        return True

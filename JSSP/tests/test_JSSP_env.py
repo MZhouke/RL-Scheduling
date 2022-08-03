@@ -30,22 +30,24 @@ JOB_OPERATION_STATUS_INSTANCE3 = np.array([0, 1])
 JOB_FINISH_TIME_INSTANCE1 = np.array([0, 0])
 JOB_FINISH_TIME_INSTANCE2 = np.array([0, 10])
 JOB_FINISH_TIME_INSTANCE3 = np.array([24, 10])
-LEGAL_ACTIONS_INSTANCE1 = {
-    0: np.array([0, 1]),
-    1: np.array([0, 2])
+LEGAL_ALLOCATIONS_INSTANCE1 = {
+    0: np.array([0, 1, -1]),
+    1: np.array([0, 2, -1])
 }
-LEGAL_ACTIONS_INSTANCE2 = {
-    0: np.array([1]),
-    1: np.array([])
+LEGAL_ALLOCATIONS_INSTANCE2 = {
+    0: np.array([1, -1]),
+    1: np.array([-1])
 }
-ACTION_1 = np.array([2, -1])
-ACTION_2 = np.array([-1, 2])
-ACTION_3 = np.array([0, -1])
-ACTION_4 = np.array([0, 0])
-ACTION_5 = np.array([1, -1])
-ACTION_J2_M1 = np.array([-1, 0])
-ACTION_J1_M2 = np.array([1, -1])
-ACTION_WAIT = np.array([-1, -1])
+ALLOCATION_1 = np.array([2, -1])
+ALLOCATION_2 = np.array([-1, 2])
+ALLOCATION_3 = np.array([0, -1])
+ALLOCATION_4 = np.array([0, 0])
+ALLOCATION_5 = np.array([1, -1])
+ACTION_J2_M1 = 5
+ALLOCATION_J1_M3 = 1
+ALLOCATION_J2_M1 = np.array([-1, 0])
+ALLOCATION_J1_M2 = np.array([1, -1])
+ALLOCATION_WAIT = np.array([-1, -1])
 
 
 def generate_env_var(instance_path):
@@ -74,8 +76,18 @@ class TestStringMethods(unittest.TestCase):
                                     MACHINE_TOTAL_INSTANCE1,
                                     OPERATION_MAP_INSTANCE1,
                                     env.job_operation_map)
+        env = generate_env_var(INSTANCE1)
+        env.initialize(INSTANCE1)
+        self.assertEqual(env.job_total, JOB_TOTAL_INSTANCE1)
+        self.assertEqual(env.machine_total, MACHINE_TOTAL_INSTANCE1)
+        self.validate_operation_map(JOB_TOTAL_INSTANCE1,
+                                    OPERATION_LEN_INSTANCE1,
+                                    MACHINE_TOTAL_INSTANCE1,
+                                    OPERATION_MAP_INSTANCE1,
+                                    env.job_operation_map)
 
     def test_populate_job_description_map(self):
+        instance = "1"
         env = generate_env_var(INSTANCE1)
         env.populate_job_description_map(JOB_DESCRIPTION_INSTANCE2, JOB_INDEX_1)
         self.validate_operation_map(JOB_TOTAL_INSTANCE1,
@@ -88,8 +100,8 @@ class TestStringMethods(unittest.TestCase):
         env = generate_env_var(INSTANCE1)
         for i in range(20):
             sample_action = env.action_space.sample()
-            self.assertTrue(np.all(sample_action <= UPPER_ACTION_INSTANCE1))
-            self.assertTrue(np.all(sample_action >= LOWER_ACTION_INSTANCE1))
+            allocation = env.legal_allocation_list[sample_action]
+            self.assertTrue(env.is_legal(allocation))
 
     def test_initialize_obs_space(self):
         env = generate_env_var(INSTANCE1)
@@ -114,34 +126,52 @@ class TestStringMethods(unittest.TestCase):
         self.assertTrue(np.array_equal(env.job_finish_time,
                                        JOB_FINISH_TIME_INSTANCE1))
 
-    def test_get_legal_actions(self):
+    def test_get_legal_allocations(self):
         env = generate_env_var(INSTANCE1)
-        legal_actions = env.get_legal_actions()
+        legal_allocations = env.get_legal_allocations()
         for i in range(env.job_total):
-            self.assertTrue(np.array_equal(legal_actions[i],
-                                           LEGAL_ACTIONS_INSTANCE1[i]))
+            self.assertTrue(np.array_equal(legal_allocations[i],
+                                           LEGAL_ALLOCATIONS_INSTANCE1[i]))
         # send job 2 -> machine 1
-        env.update_state(ACTION_J2_M1)
-        legal_actions = env.get_legal_actions()
+        env.update_state(ALLOCATION_J2_M1)
+        legal_allocations = env.get_legal_allocations()
         for i in range(env.job_total):
-            self.assertTrue(np.array_equal(legal_actions[i],
-                                           LEGAL_ACTIONS_INSTANCE2[i]))
+            self.assertTrue(np.array_equal(legal_allocations[i],
+                                           LEGAL_ALLOCATIONS_INSTANCE2[i]))
 
     def test_is_legal(self):
         env = generate_env_var(INSTANCE1)
         # send job 2 -> machine 1
-        env.update_state(ACTION_J2_M1)
-        self.assertTrue(not (env.is_legal(ACTION_1)))
-        self.assertTrue(not (env.is_legal(ACTION_2)))
-        self.assertTrue(not (env.is_legal(ACTION_3)))
-        self.assertTrue(not (env.is_legal(ACTION_4)))
-        self.assertTrue(env.is_legal(ACTION_5))
-        self.assertTrue(env.is_legal(ACTION_WAIT))
+        env.update_state(ALLOCATION_J2_M1)
+        self.assertTrue(not (env.is_legal(ALLOCATION_1)))
+        self.assertTrue(not (env.is_legal(ALLOCATION_2)))
+        self.assertTrue(not (env.is_legal(ALLOCATION_3)))
+        self.assertTrue(not (env.is_legal(ALLOCATION_4)))
+        self.assertTrue(env.is_legal(ALLOCATION_5))
+        self.assertTrue(env.is_legal(ALLOCATION_WAIT))
+
+    def test_generate_legal_allocation_list(self):
+        env = generate_env_var(INSTANCE1)
+        initial_observation = env.reset()
+        self.assertTrue(not (env.is_legal(ALLOCATION_1)))
+        self.assertTrue(env.is_legal(ALLOCATION_2))
+        self.assertTrue(env.is_legal(ALLOCATION_3))
+        self.assertTrue(not (env.is_legal(ALLOCATION_4)))
+        self.assertTrue(env.is_legal(ALLOCATION_5))
+        self.assertTrue(env.is_legal(ALLOCATION_WAIT))
+        # send job 2 -> machine 1
+        env.step(ACTION_J2_M1)
+        self.assertTrue(not (env.is_legal(ALLOCATION_1)))
+        self.assertTrue(not (env.is_legal(ALLOCATION_2)))
+        self.assertTrue(not (env.is_legal(ALLOCATION_3)))
+        self.assertTrue(not (env.is_legal(ALLOCATION_4)))
+        self.assertTrue(env.is_legal(ALLOCATION_5))
+        self.assertTrue(env.is_legal(ALLOCATION_WAIT))
 
     def test_update_state(self):
         env = generate_env_var(INSTANCE1)
         # send job 2 -> machine 1
-        env.update_state(ACTION_J2_M1)
+        env.update_state(ALLOCATION_J2_M1)
         self.assertTrue(np.array_equal(env.state[env.job_machine_allocation],
                                        JOB_MACHINE_ALLOCATION_INSTANCE2))
         self.assertTrue(np.array_equal(env.state[env.job_operation_status],
@@ -151,12 +181,12 @@ class TestStringMethods(unittest.TestCase):
         for i in range(8):
             env.update_time()
 
-        self.assertTrue(env.is_legal(ACTION_5))
-        self.assertTrue(not (env.is_legal(ACTION_2)))
-        self.assertTrue(not (env.is_legal(ACTION_3)))
+        self.assertTrue(env.is_legal(ALLOCATION_5))
+        self.assertTrue(not (env.is_legal(ALLOCATION_2)))
+        self.assertTrue(not (env.is_legal(ALLOCATION_3)))
 
         # send job 1 -> machine 3
-        env.update_state(ACTION_J1_M2)
+        env.update_state(ALLOCATION_J1_M2)
         self.assertTrue(np.array_equal(env.state[env.job_machine_allocation],
                                        JOB_MACHINE_ALLOCATION_INSTANCE3))
         self.assertTrue(np.array_equal(env.state[env.job_operation_status],
@@ -164,11 +194,11 @@ class TestStringMethods(unittest.TestCase):
         self.assertTrue(np.array_equal(env.job_finish_time,
                                        JOB_FINISH_TIME_INSTANCE3))
 
-        self.assertTrue(not (env.is_legal(ACTION_2)))
-        self.assertTrue(not (env.is_legal(ACTION_3)))
-        self.assertTrue(not (env.is_legal(ACTION_5)))
+        self.assertTrue(not (env.is_legal(ALLOCATION_2)))
+        self.assertTrue(not (env.is_legal(ALLOCATION_3)))
+        self.assertTrue(not (env.is_legal(ALLOCATION_5)))
         # send job wait
-        env.update_state(ACTION_WAIT)
+        env.update_state(ALLOCATION_WAIT)
         self.assertTrue(np.array_equal(env.state[env.job_machine_allocation],
                                        JOB_MACHINE_ALLOCATION_INSTANCE3))
         self.assertTrue(np.array_equal(env.state[env.job_operation_status],
@@ -180,17 +210,6 @@ class TestStringMethods(unittest.TestCase):
     def test_step(self):
         env = generate_env_var(INSTANCE1)
         initial_observation = env.reset()
-        # illegal action
-        observation_1, reward_1, done_1, info = env.step(ACTION_1)
-        self.assertTrue(np.array_equal(observation_1[env.job_machine_allocation],
-                                       JOB_MACHINE_ALLOCATION_INSTANCE1))
-        self.assertTrue(np.array_equal(observation_1[env.job_operation_status],
-                                       JOB_OPERATION_STATUS_INSTANCE1))
-        self.assertTrue(np.array_equal(env.job_finish_time,
-                                       JOB_FINISH_TIME_INSTANCE1))
-        self.assertEqual(reward_1, env.illegal_reward)
-        self.assertEqual(env.time, 0)
-        self.assertFalse(done_1)
         # send job 2 -> machine 1
         observation_2, reward_2, done_2, info = env.step(ACTION_J2_M1)
         self.assertTrue(np.array_equal(observation_2[env.job_machine_allocation],
