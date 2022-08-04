@@ -21,12 +21,12 @@ LOWER_OPERATION_INSTANCE1 = 0
 OPERATION_LEN_INSTANCE1 = np.array([2, 3])
 JOB_DESCRIPTION_INSTANCE2 = np.array([2, 3, 1, 10, 2, 15, 3, 8, 2, 2, 10, 3, 18])
 JOB_INDEX_1 = 0
-JOB_MACHINE_ALLOCATION_INSTANCE1 = np.array([-1, -1])
-JOB_MACHINE_ALLOCATION_INSTANCE2 = np.array([-1, 0])
-JOB_MACHINE_ALLOCATION_INSTANCE3 = np.array([1, -1])
-JOB_OPERATION_STATUS_INSTANCE1 = np.array([0, 0])
-JOB_OPERATION_STATUS_INSTANCE2 = np.array([0, 0])
-JOB_OPERATION_STATUS_INSTANCE3 = np.array([0, 1])
+JOB_MACHINE_ALLOCATION_INSTANCE1 = (-1, -1)
+JOB_MACHINE_ALLOCATION_INSTANCE2 = (-1, 0)
+JOB_MACHINE_ALLOCATION_INSTANCE3 = (1, -1)
+JOB_OPERATION_STATUS_INSTANCE1 = (0, 0)
+JOB_OPERATION_STATUS_INSTANCE2 = (0, 0)
+JOB_OPERATION_STATUS_INSTANCE3 = (0, 1)
 JOB_FINISH_TIME_INSTANCE1 = np.array([0, 0])
 JOB_FINISH_TIME_INSTANCE2 = np.array([0, 10])
 JOB_FINISH_TIME_INSTANCE3 = np.array([24, 10])
@@ -45,6 +45,7 @@ ALLOCATION_4 = np.array([0, 0])
 ALLOCATION_5 = np.array([1, -1])
 ACTION_J2_M1 = 5
 ACTION_J1_M2 = 0
+ACTION_WAIT = 1
 ALLOCATION_J1_M3 = 1
 ALLOCATION_J2_M1 = np.array([-1, 0])
 ALLOCATION_J1_M2 = np.array([1, -1])
@@ -108,22 +109,22 @@ class TestStringMethods(unittest.TestCase):
         env = generate_env_var(INSTANCE1)
         for i in range(20):
             sample_observation = env.observation_space.sample()
-            self.assertTrue(np.all(sample_observation[env.job_machine_allocation]
+            self.assertTrue(np.all(np.array(sample_observation[:env.job_total])
                                    <= UPPER_ALLOCATION_INSTANCE1))
-            self.assertTrue(np.all(sample_observation[env.job_machine_allocation]
+            self.assertTrue(np.all(np.array(sample_observation[:env.job_total])
                                    >= LOWER_ALLOCATION_INSTANCE1))
-            self.assertTrue(np.all(sample_observation[env.job_operation_status]
+            self.assertTrue(np.all(np.array(sample_observation[env.job_total:])
                                    <= UPPER_OPERATION_INSTANCE1))
-            self.assertTrue(np.all(sample_observation[env.job_operation_status]
+            self.assertTrue(np.all(np.array(sample_observation[env.job_total:])
                                    >= LOWER_OPERATION_INSTANCE1))
 
     def test_get_obs(self):
         env = generate_env_var(INSTANCE1)
         observation = env.get_obs()
-        self.assertTrue(np.array_equal(observation[env.job_machine_allocation],
-                                       JOB_MACHINE_ALLOCATION_INSTANCE1))
-        self.assertTrue(np.array_equal(observation[env.job_operation_status],
-                                       JOB_OPERATION_STATUS_INSTANCE1))
+        self.assertTrue(observation[:env.job_total],
+                        JOB_MACHINE_ALLOCATION_INSTANCE1)
+        self.assertTrue(observation[env.job_total:],
+                        JOB_OPERATION_STATUS_INSTANCE1)
         self.assertTrue(np.array_equal(env.job_finish_time,
                                        JOB_FINISH_TIME_INSTANCE1))
 
@@ -173,11 +174,11 @@ class TestStringMethods(unittest.TestCase):
         env = generate_env_var(INSTANCE1)
         initial_observation = env.reset()
         # send job 2 -> machine 1
-        env.step(ACTION_J2_M1)
-        self.assertTrue(np.array_equal(env.state[env.job_machine_allocation],
-                                       JOB_MACHINE_ALLOCATION_INSTANCE2))
-        self.assertTrue(np.array_equal(env.state[env.job_operation_status],
-                                       JOB_OPERATION_STATUS_INSTANCE2))
+        observation, reward, done, info = env.step(ACTION_J2_M1)
+        self.assertTrue(observation[:env.job_total],
+                        JOB_MACHINE_ALLOCATION_INSTANCE2)
+        self.assertTrue(observation[env.job_total:],
+                        JOB_OPERATION_STATUS_INSTANCE2)
         self.assertTrue(np.array_equal(env.job_finish_time,
                                        JOB_FINISH_TIME_INSTANCE2))
         for i in range(8):
@@ -188,11 +189,11 @@ class TestStringMethods(unittest.TestCase):
         self.assertTrue(not (env.is_legal(ALLOCATION_3)))
 
         # send job 1 -> machine 3
-        env.step(ACTION_J1_M2)
-        self.assertTrue(np.array_equal(env.state[env.job_machine_allocation],
-                                       JOB_MACHINE_ALLOCATION_INSTANCE3))
-        self.assertTrue(np.array_equal(env.state[env.job_operation_status],
-                                       JOB_OPERATION_STATUS_INSTANCE3))
+        observation, reward, done, info = env.step(ACTION_J1_M2)
+        self.assertTrue(observation[:env.job_total],
+                        JOB_MACHINE_ALLOCATION_INSTANCE3)
+        self.assertTrue(observation[env.job_total:],
+                        JOB_OPERATION_STATUS_INSTANCE3)
         self.assertTrue(np.array_equal(env.job_finish_time,
                                        JOB_FINISH_TIME_INSTANCE3))
 
@@ -200,11 +201,11 @@ class TestStringMethods(unittest.TestCase):
         self.assertTrue(not (env.is_legal(ALLOCATION_3)))
         self.assertTrue(not (env.is_legal(ALLOCATION_5)))
         # send job wait
-        env.update_state(ALLOCATION_WAIT)
-        self.assertTrue(np.array_equal(env.state[env.job_machine_allocation],
-                                       JOB_MACHINE_ALLOCATION_INSTANCE3))
-        self.assertTrue(np.array_equal(env.state[env.job_operation_status],
-                                       JOB_OPERATION_STATUS_INSTANCE3))
+        observation, reward, done, info = env.step(ACTION_WAIT)
+        self.assertTrue(observation[:env.job_total],
+                        JOB_MACHINE_ALLOCATION_INSTANCE3)
+        self.assertTrue(observation[env.job_total:],
+                        JOB_OPERATION_STATUS_INSTANCE3)
         self.assertTrue(np.array_equal(env.job_finish_time,
                                        JOB_FINISH_TIME_INSTANCE3))
         self.assertEqual(env.time, 11)
@@ -214,10 +215,10 @@ class TestStringMethods(unittest.TestCase):
         initial_observation = env.reset()
         # send job 2 -> machine 1
         observation_2, reward_2, done_2, info = env.step(ACTION_J2_M1)
-        self.assertTrue(np.array_equal(observation_2[env.job_machine_allocation],
-                                       JOB_MACHINE_ALLOCATION_INSTANCE2))
-        self.assertTrue(np.array_equal(observation_2[env.job_operation_status],
-                                       JOB_OPERATION_STATUS_INSTANCE2))
+        self.assertTrue(observation_2[:env.job_total],
+                        JOB_MACHINE_ALLOCATION_INSTANCE2)
+        self.assertTrue(observation_2[env.job_total:],
+                        JOB_OPERATION_STATUS_INSTANCE2)
         self.assertTrue(np.array_equal(env.job_finish_time,
                                        JOB_FINISH_TIME_INSTANCE2))
         self.assertEqual(reward_2, -1)
@@ -229,10 +230,10 @@ class TestStringMethods(unittest.TestCase):
         initial_observation = env.reset()
         env.step(ACTION_J2_M1)
         observation_after_reset = env.reset()
-        self.assertTrue(np.array_equal(observation_after_reset[env.job_machine_allocation],
-                                       JOB_MACHINE_ALLOCATION_INSTANCE1))
-        self.assertTrue(np.array_equal(observation_after_reset[env.job_operation_status],
-                                       JOB_OPERATION_STATUS_INSTANCE1))
+        self.assertTrue(observation_after_reset[:env.job_total],
+                        JOB_MACHINE_ALLOCATION_INSTANCE1)
+        self.assertTrue(observation_after_reset[env.job_total:],
+                        JOB_OPERATION_STATUS_INSTANCE1)
         self.assertTrue(np.array_equal(env.job_finish_time,
                                        JOB_FINISH_TIME_INSTANCE1))
 

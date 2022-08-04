@@ -120,33 +120,30 @@ class JSSPEnv(gym.Env):
 
     def initialize_obs_space(self):
         """
-            observation: dictionary of two entries:
+            observation: tuple of self.state
+            self.state: dictionary of two entries:
                         "job_machine_allocation" : array of integers representing ith job's allocation
                                     -1 represents an empty allocation
                                     -2 represents a finished job
                         "job_operation_status" : array of integers representing ith job's current operation status
-                        ex. {
-                                job_machine_allocation: [-1,0,1]
-                                job_operation_status: [0,0,1]
-                            }
+                        ex.
+                        observation = (-1,0,1,0,0,1)
+                        self.state = {
+                                        job_machine_allocation: [-1,0,1]
+                                        job_operation_status: [0,0,1]
+                                    }
                         job 1 (operation 1) -> None
                         job 2 (operation 1) -> machine 1
                         job 3 (operation 2) -> machine 2
+
         """
         lower_bound_obs_space_allocation = np.full(self.job_total, -2)
         upper_bound_obs_space_allocation = np.full(self.job_total, self.machine_total - 1)
         lower_bound_obs_space_operation = np.full(self.job_total, 0)
         upper_bound_obs_space_operation = np.full(self.job_total, self.max_operation_count - 1)
-        self.observation_space = gym.spaces.Dict(
-            {
-                self.job_machine_allocation: gym.spaces.Box(low=lower_bound_obs_space_allocation,
-                                                            high=upper_bound_obs_space_allocation,
-                                                            dtype=np.int),
-                self.job_operation_status: gym.spaces.Box(low=lower_bound_obs_space_operation,
-                                                          high=upper_bound_obs_space_operation,
-                                                          dtype=int),
-            }
-        )
+        lower_bound = np.append(lower_bound_obs_space_allocation, lower_bound_obs_space_operation)
+        upper_bound = np.append(upper_bound_obs_space_allocation, upper_bound_obs_space_operation)
+        self.observation_space = gym.spaces.Box(low=lower_bound,high=upper_bound,dtype=np.int)
 
     def get_obs(self):
         """
@@ -169,7 +166,9 @@ class JSSPEnv(gym.Env):
                     job 3 (operation 2) -> machine 2, finish at timestep 18
 
         """
-        return self.state
+        observation = tuple(np.append(self.state[self.job_machine_allocation],
+                                      self.state[self.job_operation_status]))
+        return observation
 
     def get_legal_allocations(self):
         """
@@ -312,7 +311,6 @@ class JSSPEnv(gym.Env):
         self.initialize_action_space()
         self.initialize_obs_space()
         self.time = 0
-
         return self.get_obs()
 
     def render(self, mode="human"):
