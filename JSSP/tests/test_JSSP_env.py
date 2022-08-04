@@ -44,6 +44,7 @@ ALLOCATION_3 = np.array([0, -1])
 ALLOCATION_4 = np.array([0, 0])
 ALLOCATION_5 = np.array([1, -1])
 ACTION_J2_M1 = 5
+ACTION_J1_M2 = 0
 ALLOCATION_J1_M3 = 1
 ALLOCATION_J2_M1 = np.array([-1, 0])
 ALLOCATION_J1_M2 = np.array([1, -1])
@@ -170,8 +171,9 @@ class TestStringMethods(unittest.TestCase):
 
     def test_update_state(self):
         env = generate_env_var(INSTANCE1)
+        initial_observation = env.reset()
         # send job 2 -> machine 1
-        env.update_state(ALLOCATION_J2_M1)
+        env.step(ACTION_J2_M1)
         self.assertTrue(np.array_equal(env.state[env.job_machine_allocation],
                                        JOB_MACHINE_ALLOCATION_INSTANCE2))
         self.assertTrue(np.array_equal(env.state[env.job_operation_status],
@@ -186,7 +188,7 @@ class TestStringMethods(unittest.TestCase):
         self.assertTrue(not (env.is_legal(ALLOCATION_3)))
 
         # send job 1 -> machine 3
-        env.update_state(ALLOCATION_J1_M2)
+        env.step(ACTION_J1_M2)
         self.assertTrue(np.array_equal(env.state[env.job_machine_allocation],
                                        JOB_MACHINE_ALLOCATION_INSTANCE3))
         self.assertTrue(np.array_equal(env.state[env.job_operation_status],
