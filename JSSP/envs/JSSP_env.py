@@ -287,6 +287,12 @@ class JSSPEnv(gym.Env):
         reward = max(-1, working_machines * weight)
         return reward
 
+    def skip_to_next_allocation(self):
+        """
+        skips
+
+        """
+
     def step(self, action):
         """
             1. update the state
@@ -307,13 +313,21 @@ class JSSPEnv(gym.Env):
             done: boolean stating whether all jobs are finished
 
         """
+        reward = -1
         allocation = self.legal_allocation_list[action]
         self.update_state(allocation)
-        reward = -1
         done = np.all(self.state[self.job_machine_allocation] == -2)
         if done:
-            return self.get_obs(), 150 - self.time, done, {}
+            reward = 0
+            return self.get_obs(), reward, done, {}
         self.generate_legal_allocation_list()
+        while len(self.legal_allocation_list) < 2:
+            self.update_state(self.legal_allocation_list[0])
+            self.generate_legal_allocation_list()
+            done = np.all(self.state[self.job_machine_allocation] == -2)
+            if done:
+                reward = 0
+                return self.get_obs(), reward, done, {}
         self.initialize_action_space()
         return self.get_obs(), reward, done, {}
 
