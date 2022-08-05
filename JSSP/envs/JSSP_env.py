@@ -145,9 +145,9 @@ class JSSPEnv(gym.Env):
         upper_bound_obs_finish_time = np.full(self.job_total, 100)
         lower_bound_temp = np.append(lower_bound_obs_space_allocation, lower_bound_obs_space_operation)
         upper_bound_temp = np.append(upper_bound_obs_space_allocation, upper_bound_obs_space_operation)
-        lower_bound = np.append(lower_bound_temp, lower_bound_obs_finish_time)
-        upper_bound = np.append(upper_bound_temp, upper_bound_obs_finish_time)
-        self.observation_space = gym.spaces.Box(low=lower_bound, high=upper_bound, dtype=np.int)
+        # lower_bound = np.append(lower_bound_temp, lower_bound_obs_finish_time)
+        # upper_bound = np.append(upper_bound_temp, upper_bound_obs_finish_time)
+        self.observation_space = gym.spaces.Box(low=lower_bound_temp, high=upper_bound_temp, dtype=np.int)
 
     def get_obs(self):
         """
@@ -176,7 +176,7 @@ class JSSPEnv(gym.Env):
                                   else finish_time for finish_time in self.job_finish_time])
         observation = tuple(np.append(observation_temp, job_left_time))
 
-        return observation
+        return tuple(observation_temp)
 
     def get_legal_allocations(self):
         """
