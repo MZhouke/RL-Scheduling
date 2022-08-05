@@ -287,12 +287,6 @@ class JSSPEnv(gym.Env):
         reward = max(-1, working_machines * weight)
         return reward
 
-    def skip_to_next_allocation(self):
-        """
-        skips
-
-        """
-
     def step(self, action):
         """
             1. update the state
@@ -300,6 +294,9 @@ class JSSPEnv(gym.Env):
                 when a job is finished
                 the corresponding entry in state[job_machine_allocation] = -2
             3. update legal_allocation_list and action space accordingly
+            4. If there are no other legal actions other than wait
+            fastforward to the next state with legal actions other than wait
+            5. initialize action space
         :param action: index of an allocation in the legal_allocation_list
                 last element is always wait action
         :return:
@@ -309,25 +306,24 @@ class JSSPEnv(gym.Env):
                         job_operation_status: [0,0]
 
                     }
-            reward: -1 for any time step
+            reward: -1 for any time step passed
             done: boolean stating whether all jobs are finished
 
         """
-        reward = -1
+        reward = 0
         allocation = self.legal_allocation_list[action]
         self.update_state(allocation)
         done = np.all(self.state[self.job_machine_allocation] == -2)
         if done:
-            reward = 0
-            return self.get_obs(), reward, done, {}
+            return self.get_obs(), -self.time*2, done, {}
         self.generate_legal_allocation_list()
         while len(self.legal_allocation_list) < 2:
+            reward -= 0
             self.update_state(self.legal_allocation_list[0])
-            self.generate_legal_allocation_list()
             done = np.all(self.state[self.job_machine_allocation] == -2)
             if done:
-                reward = 0
-                return self.get_obs(), reward, done, {}
+                return self.get_obs(), -self.time*2, done, {}
+            self.generate_legal_allocation_list()
         self.initialize_action_space()
         return self.get_obs(), reward, done, {}
 
