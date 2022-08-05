@@ -141,9 +141,13 @@ class JSSPEnv(gym.Env):
         upper_bound_obs_space_allocation = np.full(self.job_total, self.machine_total - 1)
         lower_bound_obs_space_operation = np.full(self.job_total, 0)
         upper_bound_obs_space_operation = np.full(self.job_total, self.max_operation_count - 1)
-        lower_bound = np.append(lower_bound_obs_space_allocation, lower_bound_obs_space_operation)
-        upper_bound = np.append(upper_bound_obs_space_allocation, upper_bound_obs_space_operation)
-        self.observation_space = gym.spaces.Box(low=lower_bound,high=upper_bound,dtype=np.int)
+        lower_bound_obs_finish_time = np.full(self.job_total, 0)
+        upper_bound_obs_finish_time = np.full(self.job_total, 100)
+        lower_bound_temp = np.append(lower_bound_obs_space_allocation, lower_bound_obs_space_operation)
+        upper_bound_temp = np.append(upper_bound_obs_space_allocation, upper_bound_obs_space_operation)
+        lower_bound = np.append(lower_bound_temp, lower_bound_obs_finish_time)
+        upper_bound = np.append(upper_bound_temp, upper_bound_obs_finish_time)
+        self.observation_space = gym.spaces.Box(low=lower_bound, high=upper_bound, dtype=np.int)
 
     def get_obs(self):
         """
@@ -161,13 +165,17 @@ class JSSPEnv(gym.Env):
                     }
                     job_finish_time = [-1, 10, 18]
 
-                    job 1 (operation 1) -> None, finish time unknown
+                    job 1 (operation 1) -> job finished
                     job 2 (operation 1) -> machine 1, finish at timestep 10
                     job 3 (operation 2) -> machine 2, finish at timestep 18
 
         """
-        observation = tuple(np.append(self.state[self.job_machine_allocation],
-                                      self.state[self.job_operation_status]))
+        observation_temp = np.append(self.state[self.job_machine_allocation],
+                                     self.state[self.job_operation_status])
+        job_left_time = np.array([finish_time - self.time if finish_time > 0
+                                  else finish_time for finish_time in self.job_finish_time])
+        observation = tuple(np.append(observation_temp, job_left_time))
+
         return observation
 
     def get_legal_allocations(self):
@@ -268,6 +276,16 @@ class JSSPEnv(gym.Env):
                     # if job is finished
                     else:
                         self.state[self.job_machine_allocation][job] = -2
+                        self.job_finish_time[job] = -1
+
+    def generate_reward(self, action):
+        if action == len(self.legal_allocation_list) - 1:
+            return 0
+        working_machines = sum([1 for machine in self.state[self.job_machine_allocation] if machine >= 0])
+        expected_finish_time = 50
+        weight = (expected_finish_time - self.time) / expected_finish_time
+        reward = max(-1, working_machines * weight)
+        return reward
 
     def step(self, action):
         """
@@ -290,12 +308,11 @@ class JSSPEnv(gym.Env):
 
         """
         allocation = self.legal_allocation_list[action]
-        reward = -1
         self.update_state(allocation)
+        reward = -1
         done = np.all(self.state[self.job_machine_allocation] == -2)
         if done:
-            self.time -= 1
-            return self.get_obs(), reward + 1, done, {}
+            return self.get_obs(), 150 - self.time, done, {}
         self.generate_legal_allocation_list()
         self.initialize_action_space()
         return self.get_obs(), reward, done, {}
