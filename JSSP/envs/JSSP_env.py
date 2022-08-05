@@ -310,19 +310,19 @@ class JSSPEnv(gym.Env):
             done: boolean stating whether all jobs are finished
 
         """
-        reward = 0
+        reward = -1
         allocation = self.legal_allocation_list[action]
         self.update_state(allocation)
         done = np.all(self.state[self.job_machine_allocation] == -2)
         if done:
-            return self.get_obs(), -self.time*2, done, {}
+            return self.get_obs(), reward, done, {}
         self.generate_legal_allocation_list()
         while len(self.legal_allocation_list) < 2:
-            reward -= 0
+            reward -= 1
             self.update_state(self.legal_allocation_list[0])
             done = np.all(self.state[self.job_machine_allocation] == -2)
             if done:
-                return self.get_obs(), -self.time*2, done, {}
+                return self.get_obs(), reward, done, {}
             self.generate_legal_allocation_list()
         self.initialize_action_space()
         return self.get_obs(), reward, done, {}
