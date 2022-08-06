@@ -70,7 +70,7 @@ class JSSPEnv(gym.Env):
             self.job_operation_map[job_index] = {}
             self.max_operation_count = max(self.max_operation_count, job_description[0])
             # initialize job_operation_map
-            # ex. job_operation_map[1][2][3] = time it takes for 3rd machine to execute 2nd operation of 1st job
+            # ex. job_operation_map[0][1][2] = time it takes for 3rd machine to execute 2nd operation of 1st job
             # time = -1 iff the machine is not capable of executing the operation based on instance description
             for operation_index in range(job_description[0]):
                 self.job_operation_map[job_index][operation_index] = np.negative(np.ones(self.machine_total))
@@ -279,6 +279,11 @@ class JSSPEnv(gym.Env):
                         self.job_finish_time[job] = -1
 
     def generate_reward(self, action):
+        """
+        function used to generate reward of current state_action pair
+        :param action: index of an allocation in the legal_allocation_list
+        :return: R(S,A) reward of current state_action pair
+        """
         if action == len(self.legal_allocation_list) - 1:
             return 0
         working_machines = sum([1 for machine in self.state[self.job_machine_allocation] if machine >= 0])
