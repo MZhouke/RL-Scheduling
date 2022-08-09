@@ -36,6 +36,8 @@ class JSSPEnv(gym.Env):
         self.job_finish_time = np.zeros(self.job_total)
         # legal_allocation_list stores the list of actions at the current state
         self.legal_allocation_list = []
+        # legal_allocation_map stores all allocation list, state pairs
+        self.legal_allocation_map = {}
         self.generate_legal_allocation_list()
         self.initialize_action_space()
         self.initialize_obs_space()
@@ -172,9 +174,9 @@ class JSSPEnv(gym.Env):
         """
         observation_temp = np.append(self.state[self.job_machine_allocation],
                                      self.state[self.job_operation_status])
-        job_left_time = np.array([finish_time - self.time if finish_time > 0
-                                  else finish_time for finish_time in self.job_finish_time])
-        observation = tuple(np.append(observation_temp, job_left_time))
+        # job_left_time = np.array([finish_time - self.time if finish_time > 0
+        #                           else finish_time for finish_time in self.job_finish_time])
+        # observation = tuple(np.append(observation_temp, job_left_time))
 
         return tuple(observation_temp)
 
@@ -227,6 +229,10 @@ class JSSPEnv(gym.Env):
         4. no duplicate job allocation
         we check the first 3 conditions in get_legal_allocations
         """
+        current_obs = self.get_obs()
+        if current_obs in self.legal_allocation_map:
+            self.legal_allocation_list = self.legal_allocation_map[current_obs]
+            return
         legal_allocations = self.get_legal_allocations()
         allocation_list = list(itertools.product(*legal_allocations))
         legal_allocations_list = []
@@ -236,6 +242,7 @@ class JSSPEnv(gym.Env):
             if len(np.unique(duplicate_check_list)) == len(duplicate_check_list):
                 legal_allocations_list.append(np.array(allocation))
         self.legal_allocation_list = legal_allocations_list
+        self.legal_allocation_map[self.get_obs()] = legal_allocations_list
 
     def update_state(self, allocation):
         """
