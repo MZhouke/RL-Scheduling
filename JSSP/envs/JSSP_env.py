@@ -322,23 +322,25 @@ class JSSPEnv(gym.Env):
             done: boolean stating whether all jobs are finished
 
         """
-        reward = -1
-        allocation = self.legal_allocation_list[action]
-        self.update_state(allocation)
-        done = np.all(self.state[self.job_machine_allocation] == -2)
-        if done:
-            return self.get_obs(), reward, done, {}
-        self.generate_legal_allocation_list()
-        while len(self.legal_allocation_list) < 2:
+        reward = 0
+        while True:
             reward -= 1
-            self.update_state(self.legal_allocation_list[0])
+            allocation = self.legal_allocation_list[action]
+            # 1. update the state
+            self.update_state(allocation)
             done = np.all(self.state[self.job_machine_allocation] == -2)
+            # 2. check if finished
             if done:
                 return self.get_obs(), reward, done, {}
+            # 3. update legal allocation list
             self.generate_legal_allocation_list()
-        self.initialize_action_space()
-        return self.get_obs(), reward, done, {}
-
+            # 4. if next state has legal action other than wait
+            if len(self.legal_allocation_list) > 1:
+                # 6. re-initialize action space
+                self.initialize_action_space()
+                return self.get_obs(), reward, done, {}
+            # new action entering loop is wait
+            action = -1
     def reset(self):
         self.state = {
             self.job_machine_allocation: np.negative(np.ones(self.job_total)),
