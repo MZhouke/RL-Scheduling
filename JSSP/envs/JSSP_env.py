@@ -331,7 +331,7 @@ class JSSPEnv(gym.Env):
             done = np.all(self.state[self.job_machine_allocation] == -2)
             # 2. check if finished
             if done:
-                return self.get_obs(), 100, done, {}
+                return self.get_obs(), reward, done, {}
             # 3. update legal allocation list
             self.generate_legal_allocation_list()
             # 4. if next state has legal action other than wait
