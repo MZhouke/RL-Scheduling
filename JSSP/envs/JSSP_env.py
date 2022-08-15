@@ -341,6 +341,7 @@ class JSSPEnv(gym.Env):
                 return self.get_obs(), reward, done, {}
             # new action entering loop is wait
             action = -1
+
     def reset(self):
         self.state = {
             self.job_machine_allocation: np.negative(np.ones(self.job_total)),
