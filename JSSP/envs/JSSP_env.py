@@ -291,13 +291,13 @@ class JSSPEnv(gym.Env):
         :param action: index of an allocation in the legal_allocation_list
         :return: R(S,A) reward of current state_action pair
         """
-        if action == len(self.legal_allocation_list) - 1:
-            return 0
-        working_machines = sum([1 for machine in self.state[self.job_machine_allocation] if machine >= 0])
-        expected_finish_time = 50
-        weight = (expected_finish_time - self.time) / expected_finish_time
-        reward = max(-1, working_machines * weight)
-        return reward
+        # if action == len(self.legal_allocation_list) - 1:
+        #     return 0
+        # working_machines = sum([1 for machine in self.state[self.job_machine_allocation] if machine >= 0])
+        # expected_finish_time = 50
+        # weight = (expected_finish_time - self.time) / expected_finish_time
+        # reward = max(-1, working_machines * weight)
+        return -10
 
     def step(self, action):
         """
@@ -324,7 +324,7 @@ class JSSPEnv(gym.Env):
         """
         reward = 0
         while True:
-            reward -= 1
+            reward += self.generate_reward(action)
             allocation = self.legal_allocation_list[action]
             # 1. update the state
             self.update_state(allocation)
