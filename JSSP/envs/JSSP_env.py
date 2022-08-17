@@ -5,6 +5,7 @@ import pandas as pd
 import random
 import datetime
 import itertools
+import copy
 
 
 class JSSPEnv(gym.Env):
@@ -207,18 +208,20 @@ class JSSPEnv(gym.Env):
         legal_allocations = []
         job_index = 0
         for current_operation in self.state[self.job_operation_status]:
-            # retrieve the list of machines capable of current operation of the job
-            job_operation_machine_time = self.job_operation_map[job_index][current_operation]
-            legal_machines = np.array([i for i in range(self.machine_total)
-                                       if job_operation_machine_time[i] >= 0])
             job_machine_allocation = self.state[self.job_machine_allocation]
             # legal actions requires:
             # 1. machine operation pair is legal
             # 2. job is not allocated or finished
             # 3. machine is not allocated
-            free_legal_machines = [i for i in legal_machines
-                                   if job_machine_allocation[job_index] == -1
-                                   if i not in job_machine_allocation]
+            if current_operation == -1:
+                free_legal_machines = []
+            else:
+                job_operation_machine_time = self.job_operation_map[job_index][current_operation]
+                legal_machines = np.array([i for i in range(self.machine_total)
+                                           if job_operation_machine_time[i] >= 0])
+                free_legal_machines = [i for i in legal_machines
+                                       if job_machine_allocation[job_index] == -1
+                                       if i not in job_machine_allocation]
             free_legal_machines.append(-1)
             legal_allocations.append(free_legal_machines)
             job_index += 1
@@ -354,11 +357,13 @@ class JSSPEnv(gym.Env):
 
     def reset(self):
         if self.initial_state_specified:
+            initial_job_machine_allocation = copy.deepcopy(self.initial_job_machine_allocation)
             self.state = {
-                self.job_machine_allocation: self.initial_job_machine_allocation,
+                self.job_machine_allocation: initial_job_machine_allocation,
                 self.job_operation_status: np.full(self.job_total, -1, dtype=int),
             }
-            self.job_finish_time = self.initial_job_available_time
+            initial_job_available_time = copy.deepcopy(self.initial_job_available_time)
+            self.job_finish_time = initial_job_available_time
         else:
             self.state = {
                 self.job_machine_allocation: np.negative(np.ones(self.job_total)),
