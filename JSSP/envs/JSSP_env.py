@@ -236,6 +236,7 @@ class JSSPEnv(gym.Env):
         2. job is not allocated or finished
         3. machine is not allocated
         4. no duplicate job allocation
+        5. if all jobs are idle, wait is not allowed
         we check the first 3 conditions in get_legal_allocations
         """
         current_obs = self.get_obs()
@@ -246,10 +247,14 @@ class JSSPEnv(gym.Env):
         allocation_list = list(itertools.product(*legal_allocations))
         legal_allocations_list = []
         for allocation in allocation_list:
-            # check for duplicate job allocation
+            # 4. check for duplicate job allocation
             duplicate_check_list = [machine for machine in allocation if machine != -1]
             if len(np.unique(duplicate_check_list)) == len(duplicate_check_list):
                 legal_allocations_list.append(np.array(allocation))
+        # 5. check if no job is working
+        all_job_idle = np.all(self.state[self.job_machine_allocation] < 0)
+        if all_job_idle:
+            legal_allocations_list.pop()
         self.legal_allocation_list = legal_allocations_list
         self.legal_allocation_map[self.get_obs()] = legal_allocations_list
 
@@ -310,7 +315,7 @@ class JSSPEnv(gym.Env):
         # expected_finish_time = 50
         # weight = (expected_finish_time - self.time) / expected_finish_time
         # reward = max(-1, working_machines * weight)
-        return -10
+        return -1
 
     def step(self, action):
         """
@@ -324,6 +329,7 @@ class JSSPEnv(gym.Env):
             5. initialize action space
         :param action: index of an allocation in the legal_allocation_list
                 last element is always wait action
+                we design list this way because Q table tie breaks from left to right
         :return:
             observation: current state
                 ex. {
