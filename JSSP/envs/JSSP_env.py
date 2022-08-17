@@ -8,7 +8,7 @@ import itertools
 
 
 class JSSPEnv(gym.Env):
-    def __init__(self, instance_path):
+    def __init__(self, instance_path, initial_state_data=None):
 
         """
         env_data: n+1 rows
@@ -49,6 +49,12 @@ class JSSPEnv(gym.Env):
         self.colors = [
             tuple([random.random() for _ in range(3)]) for _ in range(self.machine_total)
         ]
+        if initial_state_data:
+            self.initial_job_machine_allocation = np.array(initial_state_data[1], dtype=int)
+            self.initial_job_available_time = np.array(initial_state_data[0], dtype=int)
+            self.initial_state_specified = True
+        else:
+            self.initial_state_specified = False
 
     def initialize(self, instance_path):
         """
@@ -265,6 +271,10 @@ class JSSPEnv(gym.Env):
                 # update the finish time and job_operation_status
                 current_operation_duration = self.job_operation_map[job][current_operation][machine]
                 self.job_finish_time[job] = self.time + current_operation_duration
+                # update the scheduling history
+                job_history = self.jobs_history[job]
+                job_history.append([machine, self.time, self.job_finish_time[job]])
+                self.jobs_history[job] = job_history
         # timestep increases by 1
         self.update_time()
         # 2. check for completed jobs
@@ -343,11 +353,18 @@ class JSSPEnv(gym.Env):
             action = -1
 
     def reset(self):
-        self.state = {
-            self.job_machine_allocation: np.negative(np.ones(self.job_total)),
-            self.job_operation_status: np.zeros(self.job_total),
-        }
-        self.job_finish_time = np.zeros(self.job_total)
+        if self.initial_state_specified:
+            self.state = {
+                self.job_machine_allocation: self.initial_job_machine_allocation,
+                self.job_operation_status: np.full(self.job_total, -1, dtype=int),
+            }
+            self.job_finish_time = self.initial_job_available_time
+        else:
+            self.state = {
+                self.job_machine_allocation: np.negative(np.ones(self.job_total)),
+                self.job_operation_status: np.zeros(self.job_total),
+            }
+            self.job_finish_time = np.zeros(self.job_total)
         self.legal_allocation_list = []
         self.generate_legal_allocation_list()
         self.initialize_action_space()
