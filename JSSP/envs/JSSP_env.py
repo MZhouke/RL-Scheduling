@@ -5,7 +5,12 @@ import pandas as pd
 import random
 import datetime
 import itertools
-import copy
+import pygame
+from pygame.locals import *
+import matplotlib
+import matplotlib.backends.backend_agg as agg
+import pylab
+from gym.utils.renderer import Renderer
 
 
 class JSSPEnv(gym.Env):
@@ -56,6 +61,7 @@ class JSSPEnv(gym.Env):
             self.initial_state_specified = True
         else:
             self.initial_state_specified = False
+        # self.renderer = Renderer(self.render_mode, self._render_frame)
 
     def initialize(self, instance_path):
         """
@@ -383,37 +389,57 @@ class JSSPEnv(gym.Env):
         self.time = 0
         return self.get_obs()
 
-    def render(self, mode="human"):
+    def render(self, mode="human", future_data_allowed=True):
 
-        df = []
+        matplotlib.use("Agg")
+        used_machines = []
+        fig = pylab.figure(figsize=[6, 4], dpi=100, )
+        ax = fig.gca()
+        ax.clear()
 
         for job in range(self.job_total):
-            for operation in self.jobs_history[job]:
-                dict_op = dict()
-                dict_op["Task"] = "Job {}".format(job)
-                start_time = operation[1]
-                finish_time = np.min(self.time, operation[2])
-                dict_op["Start"] = datetime.datetime.fromtimestamp(start_time)
-                dict_op["Finish"] = datetime.datetime.fromtimestamp(finish_time)
-                dict_op["Resource"] = "Machine {}".format(operation[0])
-                df.append(dict_op)
+            job_history = self.jobs_history[job]
+            for operation_history in job_history:
+                [machine, start_time, end_time] = operation_history
+                if not future_data_allowed:
+                    end_time = np.min(end_time, self.time)
+                if machine not in used_machines:
+                    used_machines.append(machine)
+                ax.barh(job, width=end_time - start_time, height=0.8, left=start_time, color=self.colors[machine],
+                        edgecolor='black')
 
-        fig = None
+        legend = ['machine' + str(machine + 1) for machine in used_machines]
+        ax.set_yticks(np.arange(self.job_total), np.arange(1, self.job_total + 1))
+        # Shrink current axis by 20%
+        box = ax.get_position()
+        ax.set_position([box.x0, box.y0, box.width * 0.8, box.height])
 
-        if len(df) > 0:
-            df = pd.DataFrame(df)
-            fig = ff.create_gantt(
-                df,
-                index_col="Resource",
-                colors=self.colors,
-                show_colorbar=True,
-                group_tasks=True,
-            )
-            fig.update_yaxes(
-                autorange="reversed"
-            )  # otherwise tasks are listed from the bottom up
+        # Put a legend to the right of the current axis
+        ax.legend(legend, loc='center left', bbox_to_anchor=(1, 0.5))
 
-        return fig
+        canvas = agg.FigureCanvasAgg(fig)
+        canvas.draw()
+        renderer = canvas.get_renderer()
+        raw_data = renderer.tostring_rgb()
+
+        pygame.init()
+        print(raw_data)
+
+        window = pygame.display.set_mode((600, 400), DOUBLEBUF)
+        screen = pygame.display.get_surface()
+
+        size = canvas.get_width_height()
+
+        surf = pygame.image.fromstring(raw_data, size, "RGB")
+        screen.blit(surf, (0, 0))
+        pygame.event.pump()
+        pygame.display.flip()
+
+        # crashed = False
+        # while not crashed:
+        #     for event in pygame.event.get():
+        #         if event.type == pygame.QUIT:
+        #             crashed = True
 
     def is_legal(self, allocation):
         """
