@@ -82,7 +82,6 @@ class JSSPEnv(gym.Env):
         lines_list = file_handle.readlines()
         # first line consists of # of jobs in total, # of machines in total
         self.job_total, self.machine_total = [int(x) for x in lines_list[0].split()]
-        # env_data = [[int(val) for val in line.split()] for line in lines_list[1:]]
         # read through each job description
         for job_index in range(len(lines_list) - 1):
             job_description = np.array([int(val) for val in lines_list[job_index + 1].split()])
