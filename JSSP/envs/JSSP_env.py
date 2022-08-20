@@ -62,12 +62,12 @@ class JSSPEnv(gym.Env):
 
     def generate_colors(self):
         colors_dict = ['red', 'blue', 'yellow', 'orange', 'green', 'palegoldenrod', 'purple', 'pink', 'Thistle', 'Magenta', 'SlateBlue', 'RoyalBlue', 'Cyan', 'Aqua', 'floralwhite', 'ghostwhite', 'goldenrod', 'mediumslateblue', 'navajowhite', 'navy', 'sandybrown', 'moccasin']
-        if self.job_total <= 22:
-            return colors_dict[:self.job_total]
+        if self.machine_total <= 22:
+            return colors_dict[:self.machine_total]
         else:
-            colors = [tuple([random.random() for _ in range(3)]) for _ in range(self.job_total)]
+            colors = [tuple([random.random() for _ in range(3)]) for _ in range(self.machine_total)]
             while len(colors) != len(set(colors)):
-                colors = [tuple([random.random() for _ in range(3)]) for _ in range(self.job_total)]
+                colors = [tuple([random.random() for _ in range(3)]) for _ in range(self.machine_total)]
             return colors
 
     def initialize(self, instance_path):
