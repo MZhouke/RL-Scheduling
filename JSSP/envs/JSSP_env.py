@@ -52,16 +52,23 @@ class JSSPEnv(gym.Env):
         # used for rendering
         self.jobs_history = [[] for _ in range(self.job_total)]
         # used for plotting
-        self.colors = [
-            tuple([random.random() for _ in range(3)]) for _ in range(self.machine_total)
-        ]
+        self.colors = self.generate_colors()
         if initial_state_data:
             self.initial_job_machine_allocation = np.array(initial_state_data[1], dtype=int)
             self.initial_job_available_time = np.array(initial_state_data[0], dtype=int)
             self.initial_state_specified = True
         else:
             self.initial_state_specified = False
-        # self.renderer = Renderer(self.render_mode, self._render_frame)
+
+    def generate_colors(self):
+        colors_dict = ['red', 'blue', 'yellow', 'orange', 'green', 'palegoldenrod', 'purple', 'pink', 'Thistle', 'Magenta', 'SlateBlue', 'RoyalBlue', 'Cyan', 'Aqua', 'floralwhite', 'ghostwhite', 'goldenrod', 'mediumslateblue', 'navajowhite', 'navy', 'sandybrown', 'moccasin']
+        if self.job_total <= 22:
+            return colors_dict[:self.job_total]
+        else:
+            colors = [tuple([random.random() for _ in range(3)]) for _ in range(self.job_total)]
+            while len(colors) != len(set(colors)):
+                colors = [tuple([random.random() for _ in range(3)]) for _ in range(self.job_total)]
+            return colors
 
     def initialize(self, instance_path):
         """
@@ -369,12 +376,12 @@ class JSSPEnv(gym.Env):
 
     def reset(self):
         if self.initial_state_specified:
-            initial_job_machine_allocation = copy.deepcopy(self.initial_job_machine_allocation)
+            initial_job_machine_allocation = np.array(self.initial_job_machine_allocation)
             self.state = {
                 self.job_machine_allocation: initial_job_machine_allocation,
                 self.job_operation_status: np.full(self.job_total, -1, dtype=int),
             }
-            initial_job_available_time = copy.deepcopy(self.initial_job_available_time)
+            initial_job_available_time = np.array(self.initial_job_available_time)
             self.job_finish_time = initial_job_available_time
         else:
             self.state = {
@@ -387,6 +394,7 @@ class JSSPEnv(gym.Env):
         self.initialize_action_space()
         self.initialize_obs_space()
         self.time = 0
+        self.jobs_history = [[] for _ in range(self.job_total)]
         return self.get_obs()
 
     def render(self, mode="human", future_data_allowed=True):
@@ -423,7 +431,6 @@ class JSSPEnv(gym.Env):
         raw_data = renderer.tostring_rgb()
 
         pygame.init()
-        print(raw_data)
 
         window = pygame.display.set_mode((600, 400), DOUBLEBUF)
         screen = pygame.display.get_surface()
@@ -435,36 +442,5 @@ class JSSPEnv(gym.Env):
         pygame.event.pump()
         pygame.display.flip()
 
-        # crashed = False
-        # while not crashed:
-        #     for event in pygame.event.get():
-        #         if event.type == pygame.QUIT:
-        #             crashed = True
-
-    def is_legal(self, allocation):
-        """
-        check if an allocation is legal
-        mainly used for testing
-        1. machine operation pair is legal
-        2. job is not allocated or finished
-        3. machine is not allocated
-        4. no duplicate job allocation
-        :param allocation: allocation: an array of integers representing allocation
-                index is job number, value is machine number
-                ex. [1, -1]
-                1st job -> 2nd machine
-                2nd job -> None
-        """
-        for job in range(self.job_total):
-            operation = self.state[self.job_operation_status][job]
-            if allocation[job] != -1:
-                if self.job_operation_map[job][operation][allocation[job]] < 0:
-                    return False
-                if self.state[self.job_machine_allocation][job] != -1:
-                    return False
-                if allocation[job] in self.state[self.job_machine_allocation]:
-                    return False
-        for machine in range(self.machine_total):
-            if np.count_nonzero(allocation == machine) > 1:
-                return False
-        return True
+    def close(self):
+        pygame.quit()
