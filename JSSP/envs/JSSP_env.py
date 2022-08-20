@@ -6,6 +6,7 @@ import matplotlib.backends.backend_agg as agg
 import numpy as np
 import pygame
 import pylab
+import matplotlib.pyplot as plt
 from pygame.locals import *
 
 

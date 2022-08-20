@@ -1,6 +1,6 @@
 import matplotlib.pyplot as plt
-from Jobs import Job
-from Machines import Machine_Time_window
+from GA.Jobs import Job
+from GA.Machines import Machine_Time_window
 import numpy as np
  
 class Decode:
