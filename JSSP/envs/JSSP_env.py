@@ -1,16 +1,13 @@
 import gym
 import numpy as np
-import plotly.figure_factory as ff
-import pandas as pd
 import random
-import datetime
 import itertools
 import pygame
 from pygame.locals import *
 import matplotlib
 import matplotlib.backends.backend_agg as agg
+import matplotlib.pyplot as plt
 import pylab
-from gym.utils.renderer import Renderer
 
 
 class JSSPEnv(gym.Env):
@@ -416,14 +413,17 @@ class JSSPEnv(gym.Env):
                 ax.barh(job, width=end_time - start_time, height=0.8, left=start_time, color=self.colors[machine],
                         edgecolor='black')
 
-        legend = ['machine' + str(machine + 1) for machine in used_machines]
+        used_machines.sort()
+        colors = dict([('machine' + str(machine + 1), self.colors[machine]) for machine in used_machines])
+        labels = list(colors.keys())
+        handles = [plt.Rectangle((0, 0), 1, 1, color=colors[label]) for label in labels]
         ax.set_yticks(np.arange(self.job_total), np.arange(1, self.job_total + 1))
         # Shrink current axis by 20%
         box = ax.get_position()
         ax.set_position([box.x0, box.y0, box.width * 0.8, box.height])
 
         # Put a legend to the right of the current axis
-        ax.legend(legend, loc='center left', bbox_to_anchor=(1, 0.5))
+        ax.legend(handles, labels, loc='center left', bbox_to_anchor=(1, 0.5))
 
         canvas = agg.FigureCanvasAgg(fig)
         canvas.draw()
