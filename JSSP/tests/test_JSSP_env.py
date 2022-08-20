@@ -103,7 +103,7 @@ class TestStringMethods(unittest.TestCase):
         for i in range(20):
             sample_action = env.action_space.sample()
             allocation = env.legal_allocation_list[sample_action]
-            self.assertTrue(env.is_legal(allocation))
+            self.assertTrue((allocation == env.legal_allocation_list).all(1).any())
 
     def test_initialize_obs_space(self):
         env = generate_env_var(INSTANCE1)
@@ -141,34 +141,34 @@ class TestStringMethods(unittest.TestCase):
             self.assertTrue(np.array_equal(legal_allocations[i],
                                            LEGAL_ALLOCATIONS_INSTANCE2[i]))
 
-    def test_is_legal(self):
-        env = generate_env_var(INSTANCE1)
-        # send job 2 -> machine 1
-        env.update_state(ALLOCATION_J2_M1)
-        self.assertTrue(not (env.is_legal(ALLOCATION_1)))
-        self.assertTrue(not (env.is_legal(ALLOCATION_2)))
-        self.assertTrue(not (env.is_legal(ALLOCATION_3)))
-        self.assertTrue(not (env.is_legal(ALLOCATION_4)))
-        self.assertTrue(env.is_legal(ALLOCATION_5))
-        self.assertTrue(env.is_legal(ALLOCATION_WAIT))
+    # def test_is_legal(self):
+    #     env = generate_env_var(INSTANCE1)
+    #     # send job 2 -> machine 1
+    #     env.update_state(ALLOCATION_J2_M1)
+    #     self.assertTrue(not (env.is_legal(ALLOCATION_1)))
+    #     self.assertTrue(not (env.is_legal(ALLOCATION_2)))
+    #     self.assertTrue(not (env.is_legal(ALLOCATION_3)))
+    #     self.assertTrue(not (env.is_legal(ALLOCATION_4)))
+    #     self.assertTrue(env.is_legal(ALLOCATION_5))
+    #     self.assertTrue(env.is_legal(ALLOCATION_WAIT))
 
     def test_generate_legal_allocation_list(self):
         env = generate_env_var(INSTANCE1)
         initial_observation = env.reset()
-        self.assertTrue(not (env.is_legal(ALLOCATION_1)))
-        self.assertTrue(env.is_legal(ALLOCATION_2))
-        self.assertTrue(env.is_legal(ALLOCATION_3))
-        self.assertTrue(not (env.is_legal(ALLOCATION_4)))
-        self.assertTrue(env.is_legal(ALLOCATION_5))
-        self.assertTrue(env.is_legal(ALLOCATION_WAIT))
+        self.assertTrue(not (ALLOCATION_1 == env.legal_allocation_list).all(1).any())
+        self.assertTrue((ALLOCATION_2 == env.legal_allocation_list).all(1).any())
+        self.assertTrue((ALLOCATION_3 == env.legal_allocation_list).all(1).any())
+        self.assertTrue(not ((ALLOCATION_4 == env.legal_allocation_list).all(1).any()))
+        self.assertTrue((ALLOCATION_5 == env.legal_allocation_list).all(1).any())
+        self.assertTrue(not ((ALLOCATION_WAIT == env.legal_allocation_list).all(1).any()))
         # send job 2 -> machine 1
         env.step(ACTION_J2_M1)
-        self.assertTrue(not (env.is_legal(ALLOCATION_1)))
-        self.assertTrue(not (env.is_legal(ALLOCATION_2)))
-        self.assertTrue(not (env.is_legal(ALLOCATION_3)))
-        self.assertTrue(not (env.is_legal(ALLOCATION_4)))
-        self.assertTrue(env.is_legal(ALLOCATION_5))
-        self.assertTrue(env.is_legal(ALLOCATION_WAIT))
+        self.assertTrue(not ((ALLOCATION_1 == env.legal_allocation_list).all(1).any()))
+        self.assertTrue(not ((ALLOCATION_2 == env.legal_allocation_list).all(1).any()))
+        self.assertTrue(not ((ALLOCATION_3 == env.legal_allocation_list).all(1).any()))
+        self.assertTrue(not ((ALLOCATION_4 == env.legal_allocation_list).all(1).any()))
+        self.assertTrue((ALLOCATION_5 == env.legal_allocation_list).all(1).any())
+        self.assertTrue((ALLOCATION_WAIT == env.legal_allocation_list).all(1).any())
 
     def test_update_state(self):
         env = generate_env_var(INSTANCE1)
@@ -184,9 +184,9 @@ class TestStringMethods(unittest.TestCase):
         for i in range(8):
             env.update_time()
 
-        self.assertTrue(env.is_legal(ALLOCATION_5))
-        self.assertTrue(not (env.is_legal(ALLOCATION_2)))
-        self.assertTrue(not (env.is_legal(ALLOCATION_3)))
+        self.assertTrue((ALLOCATION_5 == env.legal_allocation_list).all(1).any())
+        self.assertTrue(not ((ALLOCATION_2 == env.legal_allocation_list).all(1).any()))
+        self.assertTrue(not ((ALLOCATION_3 == env.legal_allocation_list).all(1).any()))
 
         # send job 1 -> machine 3
         observation, reward, done, info = env.step(ACTION_J1_M2)
@@ -197,9 +197,9 @@ class TestStringMethods(unittest.TestCase):
         self.assertTrue(np.array_equal(env.job_finish_time,
                                        JOB_FINISH_TIME_INSTANCE3))
 
-        self.assertTrue(not (env.is_legal(ALLOCATION_2)))
-        self.assertTrue(not (env.is_legal(ALLOCATION_3)))
-        self.assertTrue(not (env.is_legal(ALLOCATION_5)))
+        self.assertTrue(not ((ALLOCATION_2 == env.legal_allocation_list).all(1).any()))
+        self.assertTrue(not ((ALLOCATION_3 == env.legal_allocation_list).all(1).any()))
+        self.assertTrue(not ((ALLOCATION_5 == env.legal_allocation_list).all(1).any()))
         # send job wait
         observation, reward, done, info = env.step(ACTION_WAIT)
         self.assertTrue(observation[:env.job_total],
