@@ -1,13 +1,12 @@
-import gym
-import numpy as np
-import random
 import itertools
-import pygame
-from pygame.locals import *
+import random
+import gym
 import matplotlib
 import matplotlib.backends.backend_agg as agg
-import matplotlib.pyplot as plt
+import numpy as np
+import pygame
 import pylab
+from pygame.locals import *
 
 
 class JSSPEnv(gym.Env):
