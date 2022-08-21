@@ -241,10 +241,10 @@ class JSSPEnv(gym.Env):
         """
         generates legal_action_allocation_list:
         legal actions requires:
-        1. machine operation pair is legal
-        2. job is not allocated or finished
-        3. machine is not allocated
-        4. no duplicate job allocation
+        1. machine operation pair is present in the FJSSP instance
+        2. job is not assigned or finished
+        3. machine is not assigned
+        4. no duplicate job or machine assignments
         5. if all jobs are idle, wait is not allowed
         we check the first 3 conditions in get_legal_allocations
         """
