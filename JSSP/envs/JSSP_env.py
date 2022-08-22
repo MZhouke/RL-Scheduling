@@ -363,7 +363,8 @@ class JSSPEnv(gym.Env):
             # 3. update legal allocation list
             self.generate_legal_allocation_list()
             # 4. if next state has legal action other than wait
-            if len(self.legal_allocation_list) > 1:
+            valid = len(self.legal_allocation_list) > 1
+            if valid:
                 # 6. re-initialize action space
                 self.initialize_action_space()
                 return self.get_obs(), reward, done, {}
