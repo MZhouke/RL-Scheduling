@@ -11,7 +11,7 @@ from pygame.locals import *
 
 
 class JSSPEnv(gym.Env):
-    def __init__(self, instance_path, initial_state_data=None):
+    def __init__(self, instance_path):
 
         """
         env_data: n+1 rows
@@ -50,12 +50,6 @@ class JSSPEnv(gym.Env):
         self.jobs_history = [[] for _ in range(self.job_total)]
         # used for plotting
         self.colors = self.generate_colors()
-        if initial_state_data:
-            self.initial_job_machine_allocation = np.array(initial_state_data[1], dtype=int)
-            self.initial_job_available_time = np.array(initial_state_data[0], dtype=int)
-            self.initial_state_specified = True
-        else:
-            self.initial_state_specified = False
 
     def generate_colors(self):
         colors_dict = ['red', 'blue', 'yellow', 'orange', 'green', 'palegoldenrod', 'purple', 'pink', 'Thistle', 'Magenta', 'SlateBlue', 'RoyalBlue', 'Cyan', 'Aqua', 'floralwhite', 'ghostwhite', 'goldenrod', 'mediumslateblue', 'navajowhite', 'navy', 'sandybrown', 'moccasin']
@@ -372,20 +366,11 @@ class JSSPEnv(gym.Env):
             action = -1
 
     def reset(self):
-        if self.initial_state_specified:
-            initial_job_machine_allocation = np.array(self.initial_job_machine_allocation)
-            self.state = {
-                self.job_machine_allocation: initial_job_machine_allocation,
-                self.job_operation_status: np.full(self.job_total, -1, dtype=int),
-            }
-            initial_job_available_time = np.array(self.initial_job_available_time)
-            self.job_finish_time = initial_job_available_time
-        else:
-            self.state = {
-                self.job_machine_allocation: np.negative(np.ones(self.job_total)),
-                self.job_operation_status: np.zeros(self.job_total),
-            }
-            self.job_finish_time = np.zeros(self.job_total)
+        self.state = {
+            self.job_machine_allocation: np.negative(np.ones(self.job_total)),
+            self.job_operation_status: np.zeros(self.job_total),
+        }
+        self.job_finish_time = np.zeros(self.job_total)
         self.legal_allocation_list = []
         self.generate_legal_allocation_list()
         self.initialize_action_space()
