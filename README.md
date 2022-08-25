@@ -5,7 +5,7 @@ Reinforcement Learning approach to solve the Flexible Job Shop Scheduling Proble
 
 An optimized OpenAi Gym's environment to simulate the Flexible Job Shop Scheduling Problem.
 
-![til](.readme_presentation.gif)
+![til](readme_presentation.gif)
 
 Getting Started
 ------------

@@ -11,7 +11,7 @@ from pygame.locals import *
 
 
 class JSSPEnv(gym.Env):
-    def __init__(self, instance_path):
+    def __init__(self, instance_path, future_data_allowed_for_render=True):
 
         """
         env_data: n+1 rows
@@ -50,6 +50,7 @@ class JSSPEnv(gym.Env):
         self.jobs_history = [[] for _ in range(self.job_total)]
         # used for plotting
         self.colors = self.generate_colors()
+        self.future_data_allowed_for_render = future_data_allowed_for_render
 
     def generate_colors(self):
         colors_dict = ['red', 'blue', 'yellow', 'orange', 'green', 'palegoldenrod', 'purple', 'pink', 'Thistle', 'Magenta', 'SlateBlue', 'RoyalBlue', 'Cyan', 'Aqua', 'floralwhite', 'ghostwhite', 'goldenrod', 'mediumslateblue', 'navajowhite', 'navy', 'sandybrown', 'moccasin']
@@ -312,12 +313,6 @@ class JSSPEnv(gym.Env):
         :param action: index of an allocation in the legal_allocation_list
         :return: R(S,A) reward of current state_action pair
         """
-        # if action == len(self.legal_allocation_list) - 1:
-        #     return 0
-        # working_machines = sum([1 for machine in self.state[self.job_machine_allocation] if machine >= 0])
-        # expected_finish_time = 50
-        # weight = (expected_finish_time - self.time) / expected_finish_time
-        # reward = max(-1, working_machines * weight)
         return -1
 
     def step(self, action):
@@ -379,7 +374,7 @@ class JSSPEnv(gym.Env):
         self.jobs_history = [[] for _ in range(self.job_total)]
         return self.get_obs()
 
-    def render(self, mode="human", future_data_allowed=True):
+    def render(self, mode="human"):
 
         matplotlib.use("Agg")
         used_machines = []
@@ -391,7 +386,7 @@ class JSSPEnv(gym.Env):
             job_history = self.jobs_history[job]
             for operation_history in job_history:
                 [machine, start_time, end_time] = operation_history
-                if not future_data_allowed:
+                if not self.future_data_allowed_for_render:
                     end_time = np.min(end_time, self.time)
                 if machine not in used_machines:
                     used_machines.append(machine)
@@ -402,7 +397,7 @@ class JSSPEnv(gym.Env):
         colors = dict([('machine' + str(machine + 1), self.colors[machine]) for machine in used_machines])
         labels = list(colors.keys())
         handles = [plt.Rectangle((0, 0), 1, 1, color=colors[label]) for label in labels]
-        ax.set_yticks(np.arange(self.job_total), np.arange(1, self.job_total + 1))
+        ax.set_yticks(np.arange(self.job_total), ['job' + str(i) for i in range(1, self.job_total + 1)])
         # Shrink current axis by 20%
         box = ax.get_position()
         ax.set_position([box.x0, box.y0, box.width * 0.8, box.height])
