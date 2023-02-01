@@ -85,3 +85,10 @@ Email: boyang.gu19@imperial.ac.uk
 
 Name: Chenghao Jin  
 Email: steven_jin_gbhg@foxmail.com
+
+## Publication
+
+Zhou, Hongjian, Boyang Gu, and Chenghao Jin. "Reinforcement Learning Approach for Multi-Agent Flexible Scheduling Problems." arXiv preprint arXiv:2210.03674 (2022).
+
+Link to Arxiv
+https://arxiv.org/abs/2210.03674
