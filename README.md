@@ -1,4 +1,4 @@
-# RL-Research-2022-Summer
+# RL-Scheduling-2022-Summer
 Reinforcement Learning approach to solve the Flexible Job Shop Scheduling Problem.
 
 ==============================
